@@ -26,7 +26,33 @@
             width: 100vw; height: 100vh;
         }
 
-        /* --- 相機與背景層 --- */
+        /* 畫面震動特效 (破掉時觸發) */
+        .shake-screen {
+            animation: screenShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        }
+        @keyframes screenShake {
+            0%, 100% { transform: translate(0, 0); }
+            10%, 30%, 50%, 70%, 90% { transform: translate(-10px, 8px) rotate(-1deg); }
+            20%, 40%, 60%, 80% { transform: translate(10px, -8px) rotate(1deg); }
+        }
+
+        /* 白頻閃光特效 */
+        #flash-overlay {
+            position: absolute; top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background-color: white;
+            z-index: 999; pointer-events: none;
+            opacity: 0;
+        }
+        .flash-active {
+            animation: flashAnim 0.8s ease-out forwards;
+        }
+        @keyframes flashAnim {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* --- 相機與天空層 --- */
         #video_container {
             position: absolute; top: 0; left: 0;
             width: 100vw; height: 100vh;
@@ -38,16 +64,13 @@
             object-fit: cover; transform: scaleX(-1); 
         }
 
-        /* --- 風和日麗的天空背景 (預設透明，合體後漸現) --- */
         #sky-bg {
             position: absolute; top: 0; left: 0;
             width: 100vw; height: 100vh;
             background: linear-gradient(to bottom, #74ebd5, #ACB6E5);
-            opacity: 0; z-index: 2; /* 蓋在相機之上 */
-            pointer-events: none;
+            opacity: 0; z-index: 2; pointer-events: none;
             transition: opacity 2s ease-in-out;
         }
-        /* 日出的太陽 */
         #sky-bg::before {
             content: ''; position: absolute;
             bottom: 20%; left: 50%; transform: translateX(-50%);
@@ -56,14 +79,13 @@
             border-radius: 50%; opacity: 0.8;
         }
 
-        /* --- 巨蛋系統 --- */
+        /* --- 巨蛋與特效系統 --- */
         #giant-egg-wrapper {
             position: absolute;
             top: 55%; left: 50%;
             transform: translate(-50%, -50%);
             width: 220px; height: 300px;
             z-index: 10; pointer-events: none;
-            /* 讓蛋的旋轉軸心在底部，像不倒翁 */
             transform-origin: bottom center; 
             transition: transform 0.1s ease-out, filter 1s ease;
         }
@@ -74,16 +96,11 @@
             background-color: #Fdfbf7;
             border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
             box-shadow: inset -15px -15px 30px rgba(0,0,0,0.1), inset 5px 5px 15px rgba(255,255,255,0.8);
-            border: 3px solid #EBE6D9;
-            box-sizing: border-box;
+            border: 3px solid #EBE6D9; box-sizing: border-box;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        /* 下半部：一開始就顯示 */
-        #egg-bottom {
-            clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%);
-        }
-
-        /* 上半部：一開始藏在天上 */
+        #egg-bottom { clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%); }
         #egg-top {
             clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%);
             transform: translateY(-80vh);
@@ -91,27 +108,62 @@
             transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s;
         }
 
-        /* 合體動畫 Class */
-        .egg-merged #egg-top {
-            transform: translateY(0);
-            opacity: 1;
+        .egg-merged #egg-top { transform: translateY(0); opacity: 1; }
+        .egg-merged { filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.8)); }
+
+        /* 逼真裂痕 (SVG Overlay) */
+        #crack-lines {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; z-index: 15;
+            opacity: 0;
         }
-        .egg-merged {
-            /* 合體後發出金光 */
-            filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.8));
+        #crack-lines polyline {
+            fill: none; stroke: #2a2a2a; stroke-width: 4;
+            stroke-linecap: round; stroke-linejoin: round;
+            filter: drop-shadow(1px 1px 0px rgba(255,255,255,0.8));
+            stroke-dasharray: 400; stroke-dashoffset: 400;
         }
 
-        /* 破裂的蛋 */
+        /* 爆漿蛋黃 */
+        #yolk-splash {
+            position: absolute; top: 50%; left: 50%;
+            width: 120px; height: 120px;
+            background: radial-gradient(circle, #FFB300 30%, #FF8C00 100%);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            box-shadow: 0 0 30px rgba(255, 140, 0, 0.8);
+            z-index: 12; opacity: 0;
+        }
+
+        /* 破裂狀態啟動！ */
         .egg-broken-state .egg-part {
-            background: linear-gradient(135deg, #Fdfbf7 45%, #555 48%, #333 50%, #555 52%, #Fdfbf7 55%);
-            filter: grayscale(0.3); border-color: #999; box-shadow: none;
+            background: linear-gradient(135deg, #EBE6D9 45%, #999 48%, #555 50%, #999 52%, #EBE6D9 55%);
+            filter: grayscale(0.5); border-color: #777; box-shadow: none;
         }
+        /* 物理分離 */
         .egg-broken-state #egg-top {
-            transform: translateY(-20px) rotate(-15deg) translateX(-10px);
-            transition: transform 0.5s ease-out;
+            transform: translateY(-30px) translateX(-20px) rotate(-25deg);
+        }
+        .egg-broken-state #egg-bottom {
+            transform: translateY(20px) translateX(15px) rotate(15deg);
+        }
+        /* 畫出裂痕 */
+        .egg-broken-state #crack-lines { opacity: 1; }
+        .egg-broken-state #crack-lines polyline {
+            animation: drawCrack 0.4s ease-out forwards;
+        }
+        @keyframes drawCrack { to { stroke-dashoffset: 0; } }
+        /* 噴出蛋黃 */
+        .egg-broken-state #yolk-splash {
+            animation: splat 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes splat {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            100% { transform: translate(-50%, -30%) scale(1.2); opacity: 0.9; border-radius: 40% 60% 70% 30%; }
         }
 
-        /* --- UI 浮層 --- */
+        /* --- UI 與文字 --- */
         #ui-container {
             position: absolute; top: 0; left: 0;
             width: 100vw; height: 100vh;
@@ -121,7 +173,7 @@
 
         .screen {
             background: var(--glass-bg); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-            padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             text-align: center; width: 85%; max-width: 400px;
             pointer-events: auto; border: 2px solid var(--bamboo-green);
         }
@@ -156,8 +208,7 @@
             text-shadow: 2px 2px 0px var(--bamboo-green), -2px -2px 0px var(--bamboo-green), 2px -2px 0px var(--bamboo-green), -2px 2px 0px var(--bamboo-green);
         }
 
-        /* 倒數/開始特效 */
-        @keyframes startFlash {
+        @keyframes startFlashText {
             0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
             20% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; text-shadow: 0 0 30px #FFD700; }
             80% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
@@ -169,11 +220,13 @@
             text-shadow: 0 0 20px var(--danger-red), 0 0 40px var(--danger-red);
             z-index: 100; pointer-events: none; white-space: nowrap; opacity: 0;
         }
-        .vfx-active { animation: startFlash 1.5s ease-out forwards; }
+        .vfx-active { animation: startFlashText 1.5s ease-out forwards; }
 
     </style>
 </head>
 <body>
+
+    <div id="flash-overlay"></div>
 
     <div id="video_container">
         <video id="input_video" autoplay playsinline></video>
@@ -185,6 +238,13 @@
     <div id="giant-egg-wrapper">
         <div id="egg-bottom" class="egg-part"></div>
         <div id="egg-top" class="egg-part"></div>
+        
+        <div id="yolk-splash"></div>
+        
+        <svg id="crack-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <polyline points="30,-10 45,20 35,40 60,60 50,80 70,110" />
+            <polyline points="75,-10 60,30 70,50 50,70 60,110" />
+        </svg>
     </div>
     
     <div id="start-vfx" class="hidden">開始計時！</div>
@@ -193,9 +253,9 @@
         <div id="intro-screen" class="screen">
             <h1>🌿 沉浸式立蛋挑戰 🌿</h1>
             <ul style="text-align: left; line-height: 1.6; font-size: 15px; padding-left: 20px;">
-                <li><strong>階段一：</strong> 退後，讓全身骨架進入畫面。確認後會觸發「天亮」並將你隱藏。</li>
-                <li><strong>階段二：</strong> 畫面隱藏後，請憑本體感覺，將單腳抬起貼在<strong>小腿與膝蓋一半處</strong>。</li>
-                <li><strong>破關條件：</strong> 穩住重心！畫面的巨蛋會隨你的身體傾斜，太晃蛋就會破！</li>
+                <li><strong>階段一：</strong> 退後，讓<strong>頭、膝蓋與雙腳踝</strong>完全進入畫面。確認後會觸發天亮。</li>
+                <li><strong>階段二：</strong> 請憑感覺，將單腳抬起<strong>精準貼在</strong>小腿與膝蓋一半處。</li>
+                <li><strong>嚴格破關條件：</strong> 穩住重心！如果身體太晃，或是<strong>腳滑落離開小腿</strong>，蛋都會當場爆裂！</li>
             </ul>
             <button id="start-btn">開啟鏡頭準備挑戰</button>
         </div>
@@ -230,6 +290,7 @@
         const skyBg = document.getElementById('sky-bg');
         const giantEggWrapper = document.getElementById('giant-egg-wrapper');
         const startVfx = document.getElementById('start-vfx');
+        const flashOverlay = document.getElementById('flash-overlay');
         
         const startBtn = document.getElementById('start-btn');
         const retryBtn = document.getElementById('retry-btn');
@@ -241,9 +302,13 @@
         let elapsedTime = 0;
         let timerInterval = null;
 
+        // --- 核心判定參數 ---
         const VISIBILITY_THRESHOLD = 0.6;  
         const SWAY_FAIL = 0.12;
-        const TARGET_TOLERANCE = 0.12; 
+        // 修正 2：更嚴格的啟動距離，必須貼很近才開始
+        const START_TOLERANCE = 0.08; 
+        // 修正 3：只要腳離開小腿超過這個距離，立刻判定滑落失敗
+        const DROP_TOLERANCE = 0.15; 
 
         const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
         pose.setOptions({
@@ -275,6 +340,7 @@
         retryBtn.addEventListener('click', () => {
             resultScreen.classList.add('hidden');
             gameScreen.classList.remove('hidden');
+            document.body.classList.remove('shake-screen'); // 清除震動
             resetGame();
         });
 
@@ -283,12 +349,12 @@
             elapsedTime = 0;
             timerDisplay.innerText = "0.00";
             
-            // 復原環境
             skyBg.style.opacity = '0';
-            giantEggWrapper.className = ''; // 移除合併或破裂狀態
+            giantEggWrapper.className = ''; 
             giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(0deg)`;
+            flashOverlay.className = '';
             
-            updateStatus("第一階段：請退後，讓頭與腳完整入鏡", "var(--glass-bg)", "var(--ink-black)", "var(--bamboo-green)");
+            updateStatus("第一階段：請退後，讓「頭、膝蓋、腳踝」全入鏡", "var(--glass-bg)", "var(--ink-black)", "var(--bamboo-green)");
             clearInterval(timerInterval);
         }
 
@@ -303,7 +369,6 @@
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             
-            // 只有在第一階段 (尚未天亮時) 才把相機畫面和骨架畫出來
             if (gameState === 'POSITIONING_BODY') {
                 canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
                 
@@ -314,7 +379,6 @@
                     drawLandmarks(canvasCtx, bodyLandmarks, {color: '#4A7C59', lineWidth: 2, radius: 4});
                 }
             } 
-            // 天亮之後，Canvas 就不畫任何東西了 (純透明)，完全靠 CSS 背景和巨蛋顯示
             
             if (results.poseLandmarks) {
                 processGameLogic(results.poseLandmarks);
@@ -335,33 +399,31 @@
 
             if (!nose || !leftHip || !rightHip || !leftKnee || !rightKnee || !leftAnkle || !rightAnkle) return;
 
+            // 修正 1：嚴格判定小腿與腳踝，所有部位都必須高於可見度閾值
             const isFullBodyVisible = (nose.visibility > VISIBILITY_THRESHOLD && 
+                                       leftKnee.visibility > VISIBILITY_THRESHOLD && 
+                                       rightKnee.visibility > VISIBILITY_THRESHOLD &&
                                        leftAnkle.visibility > VISIBILITY_THRESHOLD && 
                                        rightAnkle.visibility > VISIBILITY_THRESHOLD);
 
-            // --- 狀態一：全身定位 ---
             if (gameState === 'POSITIONING_BODY') {
                 if (isFullBodyVisible) {
-                    gameState = 'TRANSITIONING'; // 防止重複觸發
-                    updateStatus("✅ 完美入鏡！準備天亮...", "var(--bamboo-green)", "white", "var(--bamboo-green)");
+                    gameState = 'TRANSITIONING'; 
+                    updateStatus("✅ 全身成功入鏡！準備天亮...", "var(--bamboo-green)", "white", "var(--bamboo-green)");
                     
-                    // 觸發合體動畫與天亮
                     giantEggWrapper.classList.add('egg-merged');
                     skyBg.style.opacity = '1';
 
-                    // 給動畫 1.5 秒跑完，再進入第二階段
                     setTimeout(() => {
                         gameState = 'POSITIONING_LEG';
-                        updateStatus("第二階段：請憑感覺，將單腳抬起貼在小腿與膝蓋中點", "rgba(50,50,50,0.8)", "white", "var(--bamboo-green)");
+                        updateStatus("第二階段：請憑感覺，將單腳準確貼在小腿中點", "rgba(50,50,50,0.8)", "white", "var(--bamboo-green)");
                     }, 1500);
                 }
                 return;
             }
 
-            // --- 狀態二 & 三：盲測定位腳部 與 遊戲進行中 ---
             if (gameState === 'POSITIONING_LEG' || gameState === 'PLAYING') {
                 
-                // 判斷哪一隻腳是支撐腳
                 let standAnkle, standKnee, raisedAnkle;
                 if (leftAnkle.y > rightAnkle.y) {
                     standAnkle = leftAnkle; standKnee = leftKnee; raisedAnkle = rightAnkle;
@@ -369,7 +431,6 @@
                     standAnkle = rightAnkle; standKnee = rightKnee; raisedAnkle = leftAnkle;
                 }
 
-                // 計算目標點 (膝蓋與腳踝中點)
                 const targetMidX = (standKnee.x + standAnkle.x) / 2;
                 const targetMidY = (standKnee.y + standAnkle.y) / 2;
 
@@ -377,39 +438,36 @@
                 const dy = raisedAnkle.y - targetMidY;
                 const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
 
-                // 身體偏移量 (鼻子相對於臀部中心)
                 const hipCenterX = (leftHip.x + rightHip.x) / 2;
                 const sway = nose.x - hipCenterX; 
                 const absSway = Math.abs(sway);
 
                 if (gameState === 'POSITIONING_LEG') {
-                    // 若腳貼近中點
-                    if (distanceToTarget < TARGET_TOLERANCE) { 
+                    // 修正 2：嚴格的啟動容錯值
+                    if (distanceToTarget < START_TOLERANCE) { 
                         startGame();
                     }
                 } 
                 else if (gameState === 'PLAYING') {
-                    // 巨蛋連動傾斜特效 (放大傾斜角度讓視覺更明顯)
-                    let tiltAngle = sway * 400; 
-                    // 限制最大傾斜角度避免翻轉過頭
-                    if(tiltAngle > 45) tiltAngle = 45;
-                    if(tiltAngle < -45) tiltAngle = -45;
                     
-                    // 因為外層用了 translate(-50%, -50%) 置中，所以要在這裡合併 transform
-                    giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(${tiltAngle}deg)`;
-
-                    // 失敗判定：晃動過大
-                    if (absSway > SWAY_FAIL) {
-                        endGame("重心偏移過大，蛋破了！");
-                        return;
-                    } 
-                    // 失敗判定：腳掉落 (容錯稍微放大)
-                    else if (distanceToTarget > TARGET_TOLERANCE + 0.1) {
-                        endGame("腳滑落了！");
+                    // 修正 3：腳一離開小腿，直接破裂
+                    if (distanceToTarget > DROP_TOLERANCE) {
+                        endGame("腳滑落了！蛋破裂！");
                         return;
                     }
 
-                    // 視覺回饋提示
+                    let tiltAngle = sway * 400; 
+                    if(tiltAngle > 45) tiltAngle = 45;
+                    if(tiltAngle < -45) tiltAngle = -45;
+                    
+                    giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(${tiltAngle}deg)`;
+
+                    // 失敗判定：身體搖晃過大
+                    if (absSway > SWAY_FAIL) {
+                        endGame("身體傾斜過大，蛋破了！");
+                        return;
+                    } 
+
                     if (absSway > SWAY_FAIL * 0.6) {
                         updateStatus("⚠️ 太晃了，穩住！", "rgba(214, 73, 51, 0.9)", "white", "var(--danger-red)");
                     } else {
@@ -424,7 +482,6 @@
             startTime = Date.now();
             updateStatus("專注核心！", "rgba(74, 124, 89, 0.9)", "white", "var(--bamboo-green)");
             
-            // 觸發開場特效
             startVfx.classList.remove('hidden');
             startVfx.classList.add('vfx-active');
             setTimeout(() => {
@@ -439,15 +496,21 @@
             }, 100); 
         }
 
+        // 修正 4：史詩級破裂特效觸發區
         function endGame(reason) {
             gameState = 'GAMEOVER';
             clearInterval(timerInterval);
             
-            // 蛋破裂特效
+            // 觸發白頻閃光與全螢幕地震
+            flashOverlay.classList.add('flash-active');
+            document.body.classList.add('shake-screen');
+            
+            // 觸發巨蛋分離、裂痕與噴射蛋黃
             giantEggWrapper.classList.add('egg-broken-state');
-            updateStatus(reason, "rgba(51, 51, 51, 0.9)", "white", "#999");
+            
+            updateStatus(reason, "rgba(214, 73, 51, 0.9)", "white", "#FFF");
 
-            setTimeout(showResultScreen, 1500);
+            setTimeout(showResultScreen, 2000); // 讓特效飛一下再顯示結算
         }
 
         function showResultScreen() {

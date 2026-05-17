@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>高齡防跌：沉浸式立蛋挑戰</title>
+    <title>沉浸式立蛋挑戰</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -44,10 +44,9 @@
         .flash-active { animation: flashAnim 0.8s ease-out forwards; }
         @keyframes flashAnim { 0% { opacity: 1; } 100% { opacity: 0; } }
 
-        /* --- 強風特效 (強化版) --- */
+        /* --- 強風特效 --- */
         #wind-overlay {
             position: absolute; top: 0; left: -50vw; width: 150vw; height: 100vh;
-            /* 明顯的風切線條與半透明漸層 */
             background: repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,0.4) 40px, rgba(255,255,255,0.6) 60px, transparent 100px);
             opacity: 0; z-index: 18; pointer-events: none;
             transform: skewX(-30deg); filter: blur(3px);
@@ -193,10 +192,10 @@
 
     <div id="ui-container">
         <div id="intro-screen" class="screen">
-            <h1>🌿 防跌立蛋挑戰 🌿</h1>
+            <h1>🌿 沉浸式立蛋挑戰 🌿</h1>
             <ul style="text-align: left; line-height: 1.6; font-size: 15px; padding-left: 20px;">
                 <li><strong>準備：</strong> 退後，讓<strong>頭、膝蓋與腳踝</strong>全入鏡。</li>
-                <li><strong>開始：</strong> 畫面會出現<strong>小光圈</strong>。任一隻腳抬起貼在小腿(前後內外皆可)，即天亮計時！</li>
+                <li><strong>開始：</strong> 畫面出現小光圈後，任選一隻腳<strong>明顯抬起</strong>靠近小腿，即天亮計時！</li>
                 <li><strong>挑戰：</strong> 堅持 <strong>30 秒</strong> 獲得勝利！雙手隨意擺動沒關係，但身體重心嚴重傾斜或腳掉下來，蛋就會破！</li>
             </ul>
             <button id="start-btn">開啟鏡頭與音效</button>
@@ -213,7 +212,7 @@
             <h1 id="result-title">💥 蛋破了！ 💥</h1>
             <h2 id="final-time">堅持時間：0.00 秒</h2>
             <hr style="border-top: 1px dashed #ccc; margin: 15px 0;">
-            <h3 style="color: var(--ink-black);">高齡防跌能力評估：</h3>
+            <h3 style="color: var(--ink-black);">平衡能力評估：</h3>
             <h2 id="rank-title" style="color: var(--danger-red); font-size: 26px;">稱號</h2>
             <p id="rank-desc" style="color: #555; font-size: 15px;"></p>
             <button id="retry-btn">再挑戰一次</button>
@@ -299,12 +298,7 @@
         let elapsedTime = 0; let timerInterval = null; let windTimer = null;
         
         let lockedStandKneeIdx = null; let lockedStandAnkleIdx = null; let lockedRaisedAnkleIdx = null;
-
         const VISIBILITY_THRESHOLD = 0.6;  
-        // 放寬掉落與開始的容錯，不再侷限只能在正前方
-        const START_TOLERANCE_Y = 0.35;
-        const START_TOLERANCE_X = 0.6;
-        const DROP_TOLERANCE_Y = 0.5;
 
         const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
         pose.setOptions({ modelComplexity: 0, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
@@ -384,81 +378,96 @@
 
             if (!nose || !leftShoulder || !rightShoulder || !leftHip || !rightHip || !leftKnee || !rightKnee || !leftAnkle || !rightAnkle) return;
 
+            // --- 計算真實軀幹傾斜 (完全防禦抬手與搖頭的誤判) ---
+            const shoulderMid = { x: (leftShoulder.x + rightShoulder.x) / 2, y: (leftShoulder.y + rightShoulder.y) / 2 };
+            const hipMid = { x: (leftHip.x + rightHip.x) / 2, y: (leftHip.y + rightHip.y) / 2 };
+            const dxTilt = shoulderMid.x - hipMid.x; 
+            const dyTilt = hipMid.y - shoulderMid.y; // Y軸向下為正，所以 hip - shoulder 為正值
+            const trueTiltAngle = Math.atan2(dxTilt, dyTilt) * (180 / Math.PI); // 物理傾斜角度
+
             if (gameState === 'POSITIONING_BODY') {
                 const isFullBodyVisible = (nose.visibility > VISIBILITY_THRESHOLD && 
                                            leftKnee.visibility > VISIBILITY_THRESHOLD && rightKnee.visibility > VISIBILITY_THRESHOLD &&
                                            leftAnkle.visibility > VISIBILITY_THRESHOLD && rightAnkle.visibility > VISIBILITY_THRESHOLD);
                 if (isFullBodyVisible) {
                     gameState = 'POSITIONING_LEG'; 
-                    updateStatus("✅ 全身入鏡！請將任一隻腳抬起，放在小腿光圈處！", "#FFD700", "black", "#FFD700");
+                    updateStatus("✅ 全身入鏡！請將腳明顯抬高，靠近光圈", "#FFD700", "black", "#FFD700");
                 }
                 return;
             }
 
-            if (gameState === 'POSITIONING_LEG') {
-                const leftCalfMid = { x: (leftKnee.x + leftAnkle.x)/2, y: (leftKnee.y + leftAnkle.y)/2 };
-                const rightCalfMid = { x: (rightKnee.x + rightAnkle.x)/2, y: (rightKnee.y + rightAnkle.y)/2 };
+            if (gameState === 'POSITIONING_LEG' || gameState === 'PLAYING') {
                 
-                const leftCalfLen = getDist(leftKnee, leftAnkle); const rightCalfLen = getDist(rightKnee, rightAnkle);
-                
-                // 視覺光圈大幅縮小
-                const targetRadiusL = leftCalfLen * 0.15 * canvasElement.width; 
-                const targetRadiusR = rightCalfLen * 0.15 * canvasElement.width;
+                // 判斷支撐腳 (Y座標越大越靠近地面)
+                let standAnkle, standKnee, raisedAnkle;
+                let currentStandKneeIdx, currentStandAnkleIdx, currentRaisedAnkleIdx;
 
-                drawTargetCircle(leftCalfMid.x, leftCalfMid.y, targetRadiusL, '#FFD700');
-                drawTargetCircle(rightCalfMid.x, rightCalfMid.y, targetRadiusR, '#FFD700');
-
-                // 矩形判定區 (解決放內側、外側判定不到的問題)
-                const dyRtoL = Math.abs(rightAnkle.y - leftCalfMid.y);
-                const dxRtoL = Math.abs(rightAnkle.x - leftCalfMid.x);
-                const dyLtoR = Math.abs(leftAnkle.y - rightCalfMid.y);
-                const dxLtoR = Math.abs(leftAnkle.x - rightCalfMid.x);
-
-                if (dyRtoL < leftCalfLen * START_TOLERANCE_Y && dxRtoL < leftCalfLen * START_TOLERANCE_X) {
-                    lockedStandKneeIdx = 25; lockedStandAnkleIdx = 27; lockedRaisedAnkleIdx = 28; startGame();
-                } else if (dyLtoR < rightCalfLen * START_TOLERANCE_Y && dxLtoR < rightCalfLen * START_TOLERANCE_X) {
-                    lockedStandKneeIdx = 26; lockedStandAnkleIdx = 28; lockedRaisedAnkleIdx = 27; startGame();
-                }
-            } 
-            else if (gameState === 'PLAYING') {
-                const standKnee = landmarks[lockedStandKneeIdx]; const standAnkle = landmarks[lockedStandAnkleIdx];
-                const raisedAnkle = landmarks[lockedRaisedAnkleIdx];
-                const calfMid = { x: (standKnee.x + standAnkle.x)/2, y: (standKnee.y + standAnkle.y)/2 };
-                const calfLen = getDist(standKnee, standAnkle); 
-
-                // 判斷是否掉落 (主要看垂直高度)
-                const currentDy = Math.abs(raisedAnkle.y - calfMid.y);
-
-                // --- 🌟 防抬手誤判：用軀幹取代鼻子，計算真實身體傾斜 ---
-                const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
-                const hipCenterX = (leftHip.x + rightHip.x) / 2;
-                const sway = shoulderCenterX - hipCenterX; 
-
-                // 放大視覺傾斜角
-                let tiltAngle = sway * 450; 
-                
-                // 只要蛋碰到邊邊 (角度大於 45 度) 就直接破！
-                if (tiltAngle > 45 || tiltAngle < -45) {
-                    endGame("身體傾斜過大，碰到邊緣破裂！");
-                    return;
-                }
-
-                giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(${tiltAngle}deg)`;
-
-                if (Date.now() - playStartTime > 1000) {
-                    // 如果腳滑落 (垂直高度差異大於小腿長度 50%)
-                    if (currentDy > calfLen * DROP_TOLERANCE_Y) { 
-                        endGame("腳滑落了！蛋破裂！"); 
-                        return; 
-                    }
-
-                    if (Math.abs(tiltAngle) > 30) {
-                        updateStatus("⚠️ 太晃了，穩住核心！", "rgba(214, 73, 51, 0.9)", "white", "var(--danger-red)");
+                if (gameState === 'POSITIONING_LEG') {
+                    if (leftAnkle.y > rightAnkle.y) {
+                        standAnkle = leftAnkle; standKnee = leftKnee; raisedAnkle = rightAnkle;
+                        currentStandKneeIdx = 25; currentStandAnkleIdx = 27; currentRaisedAnkleIdx = 28;
                     } else {
-                        updateStatus("✨ 完美平衡中...", "rgba(74, 124, 89, 0.9)", "white", "var(--bamboo-green)");
+                        standAnkle = rightAnkle; standKnee = rightKnee; raisedAnkle = leftAnkle;
+                        currentStandKneeIdx = 26; currentStandAnkleIdx = 28; currentRaisedAnkleIdx = 27;
                     }
                 } else {
-                    updateStatus("🥚 天亮合體！穩住重心...", "#FFD700", "black", "#FFD700");
+                    // 遊玩中鎖定腳位
+                    standKnee = landmarks[lockedStandKneeIdx]; 
+                    standAnkle = landmarks[lockedStandAnkleIdx];
+                    raisedAnkle = landmarks[lockedRaisedAnkleIdx];
+                }
+
+                // 腳踝高度差 (判斷是否有確實抬離地面)
+                const ankleYDiff = standAnkle.y - raisedAnkle.y;
+                // 腳踝與支撐膝蓋的水平距離 (判斷是否靠近小腿)
+                const ankleXDiff = Math.abs(raisedAnkle.x - standKnee.x);
+
+                if (gameState === 'POSITIONING_LEG') {
+                    const leftCalfMid = { x: (leftKnee.x + leftAnkle.x)/2, y: (leftKnee.y + leftAnkle.y)/2 };
+                    const rightCalfMid = { x: (rightKnee.x + rightAnkle.x)/2, y: (rightKnee.y + rightAnkle.y)/2 };
+                    
+                    // 繪製極小的精緻光圈
+                    drawTargetCircle(leftCalfMid.x, leftCalfMid.y, 25, '#FFD700');
+                    drawTargetCircle(rightCalfMid.x, rightCalfMid.y, 25, '#FFD700');
+
+                    // 開始條件：腳必須確實抬起 (Y差大於10%) 並且靠近小腿 (X差小於20%)
+                    if (ankleYDiff > 0.1 && ankleXDiff < 0.2) {
+                        lockedStandKneeIdx = currentStandKneeIdx; 
+                        lockedStandAnkleIdx = currentStandAnkleIdx; 
+                        lockedRaisedAnkleIdx = currentRaisedAnkleIdx;
+                        startGame();
+                    }
+                } 
+                else if (gameState === 'PLAYING') {
+                    
+                    // 蛋視覺傾斜 (放大 2.5 倍以增加動態感)
+                    let displayTilt = trueTiltAngle * 2.5;
+                    if(displayTilt > 45) displayTilt = 45; 
+                    if(displayTilt < -45) displayTilt = -45;
+                    giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(${displayTilt}deg)`;
+
+                    if (Date.now() - playStartTime > 1000) {
+                        
+                        // 失敗條件一：偷偷把腳放下來 (高度差小於 5%)
+                        if (ankleYDiff < 0.05) {
+                            endGame("腳落地了！蛋破裂！"); 
+                            return;
+                        }
+
+                        // 失敗條件二：真實軀幹傾斜大於 18 度 (完全無視抬手)
+                        if (Math.abs(trueTiltAngle) > 18) {
+                            endGame("身體傾斜過大，蛋破了！");
+                            return;
+                        }
+
+                        if (Math.abs(trueTiltAngle) > 10) {
+                            updateStatus("⚠️ 太晃了，穩住核心！", "rgba(214, 73, 51, 0.9)", "white", "var(--danger-red)");
+                        } else {
+                            updateStatus("✨ 完美平衡中...", "rgba(74, 124, 89, 0.9)", "white", "var(--bamboo-green)");
+                        }
+                    } else {
+                        updateStatus("🥚 天亮合體！穩住重心...", "#FFD700", "black", "#FFD700");
+                    }
                 }
             }
         }
@@ -468,15 +477,14 @@
             
             playMergeSound(); 
             giantEggWrapper.classList.add('egg-merged'); 
-            skyBg.style.opacity = '1'; // 開始計時才天亮
+            skyBg.style.opacity = '1'; 
 
-            scheduleNextWind(); // 啟動不規則陣風
+            scheduleNextWind();
 
             if(timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 elapsedTime = (Date.now() - startTime) / 1000;
                 
-                // 30秒上限勝利判定
                 if(elapsedTime >= 30) {
                     elapsedTime = 30;
                     winGame();
@@ -487,10 +495,9 @@
             }, 100); 
         }
 
-        // --- 強風系統 (不規則發動) ---
+        // --- 強風系統 (隨機 3~10秒 觸發) ---
         function scheduleNextWind() {
             if (gameState !== 'PLAYING') return;
-            // 完全隨機：3秒 到 10秒 之間發動一次
             const delay = 3000 + Math.random() * 7000; 
             windTimer = setTimeout(() => {
                 if (gameState === 'PLAYING') { triggerWind(); scheduleNextWind(); }
@@ -500,11 +507,10 @@
         function triggerWind() {
             playWindSound();
             windOverlay.classList.remove('wind-active');
-            void windOverlay.offsetWidth; // 重置 CSS 動畫
+            void windOverlay.offsetWidth; 
             windOverlay.classList.add('wind-active');
         }
 
-        // --- 勝利灑花系統 ---
         function startConfetti() {
             const colors = ['#FFD700', '#D64933', '#4A7C59', '#74ebd5', '#FFF'];
             for(let i=0; i<80; i++) {
@@ -548,14 +554,14 @@
 
             if (isWin) {
                 titleEl.innerText = "🎉 挑戰成功 🎉";
-                rankTitle.innerText = "防跌大宗師 (30秒滿分)";
-                rankDesc.innerText = "太厲害了！您的核心與平衡感絕佳，下肢肌力非常健康！";
+                rankTitle.innerText = "立蛋大宗師 (30秒滿分)";
+                rankDesc.innerText = "太厲害了！你的核心與平衡感絕佳，下肢肌力非常健康！";
                 rankTitle.style.color = "var(--bamboo-green)";
             } else {
                 titleEl.innerText = "💥 蛋破了！ 💥";
                 if (elapsedTime < 10) {
                     rankTitle.innerText = "需要加強 (0-10秒)";
-                    rankDesc.innerText = "平衡感稍微不足喔！可以多扶著牆壁練習單腳站立，預防跌倒。";
+                    rankDesc.innerText = "平衡感稍微不足喔！可以多扶著牆壁練習單腳站立。";
                     rankTitle.style.color = "var(--danger-red)";
                 } else if (elapsedTime < 20) {
                     rankTitle.innerText = "表現不錯 (10-20秒)";
@@ -563,7 +569,7 @@
                     rankTitle.style.color = "#D68C33";
                 } else {
                     rankTitle.innerText = "核心達人 (20-29秒)";
-                    rankDesc.innerText = "非常優秀！您的本體感覺很敏銳，只差一點點就能拿到滿分了！";
+                    rankDesc.innerText = "非常優秀！你的本體感覺很敏銳，只差一點點就能拿到滿分了！";
                     rankTitle.style.color = "#3376D6";
                 }
             }

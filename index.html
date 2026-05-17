@@ -26,7 +26,7 @@
             width: 100vw; height: 100vh;
         }
 
-        /* 畫面震動特效 (破掉時觸發) */
+        /* 畫面震動特效 */
         .shake-screen {
             animation: screenShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
         }
@@ -111,7 +111,7 @@
         .egg-merged #egg-top { transform: translateY(0); opacity: 1; }
         .egg-merged { filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.8)); }
 
-        /* 逼真裂痕 (SVG Overlay) */
+        /* 逼真裂痕 */
         #crack-lines {
             position: absolute; top: 0; left: 0;
             width: 100%; height: 100%;
@@ -136,25 +136,22 @@
             z-index: 12; opacity: 0;
         }
 
-        /* 破裂狀態啟動！ */
+        /* 破裂狀態 */
         .egg-broken-state .egg-part {
             background: linear-gradient(135deg, #EBE6D9 45%, #999 48%, #555 50%, #999 52%, #EBE6D9 55%);
             filter: grayscale(0.5); border-color: #777; box-shadow: none;
         }
-        /* 物理分離 */
         .egg-broken-state #egg-top {
             transform: translateY(-30px) translateX(-20px) rotate(-25deg);
         }
         .egg-broken-state #egg-bottom {
             transform: translateY(20px) translateX(15px) rotate(15deg);
         }
-        /* 畫出裂痕 */
         .egg-broken-state #crack-lines { opacity: 1; }
         .egg-broken-state #crack-lines polyline {
             animation: drawCrack 0.4s ease-out forwards;
         }
         @keyframes drawCrack { to { stroke-dashoffset: 0; } }
-        /* 噴出蛋黃 */
         .egg-broken-state #yolk-splash {
             animation: splat 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
@@ -163,7 +160,7 @@
             100% { transform: translate(-50%, -30%) scale(1.2); opacity: 0.9; border-radius: 40% 60% 70% 30%; }
         }
 
-        /* --- UI 與文字 --- */
+        /* --- UI --- */
         #ui-container {
             position: absolute; top: 0; left: 0;
             width: 100vw; height: 100vh;
@@ -254,8 +251,8 @@
             <h1>🌿 沉浸式立蛋挑戰 🌿</h1>
             <ul style="text-align: left; line-height: 1.6; font-size: 15px; padding-left: 20px;">
                 <li><strong>階段一：</strong> 退後，讓<strong>頭、膝蓋與雙腳踝</strong>完全進入畫面。確認後會觸發天亮。</li>
-                <li><strong>階段二：</strong> 請憑感覺，將單腳抬起<strong>精準貼在</strong>小腿與膝蓋一半處。</li>
-                <li><strong>嚴格破關條件：</strong> 穩住重心！如果身體太晃，或是<strong>腳滑落離開小腿</strong>，蛋都會當場爆裂！</li>
+                <li><strong>階段二：</strong> 請憑感覺，將單腳確實抬起並<strong>貼在</strong>支撐腳小腿中點。</li>
+                <li><strong>破關條件：</strong> 穩住重心！如果身體太晃，或是<strong>腳滑落離開小腿</strong>，蛋都會當場爆裂！</li>
             </ul>
             <button id="start-btn">開啟鏡頭準備挑戰</button>
         </div>
@@ -302,13 +299,8 @@
         let elapsedTime = 0;
         let timerInterval = null;
 
-        // --- 核心判定參數 ---
         const VISIBILITY_THRESHOLD = 0.6;  
         const SWAY_FAIL = 0.12;
-        // 修正 2：更嚴格的啟動距離，必須貼很近才開始
-        const START_TOLERANCE = 0.08; 
-        // 修正 3：只要腳離開小腿超過這個距離，立刻判定滑落失敗
-        const DROP_TOLERANCE = 0.15; 
 
         const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
         pose.setOptions({
@@ -340,7 +332,7 @@
         retryBtn.addEventListener('click', () => {
             resultScreen.classList.add('hidden');
             gameScreen.classList.remove('hidden');
-            document.body.classList.remove('shake-screen'); // 清除震動
+            document.body.classList.remove('shake-screen'); 
             resetGame();
         });
 
@@ -399,7 +391,6 @@
 
             if (!nose || !leftHip || !rightHip || !leftKnee || !rightKnee || !leftAnkle || !rightAnkle) return;
 
-            // 修正 1：嚴格判定小腿與腳踝，所有部位都必須高於可見度閾值
             const isFullBodyVisible = (nose.visibility > VISIBILITY_THRESHOLD && 
                                        leftKnee.visibility > VISIBILITY_THRESHOLD && 
                                        rightKnee.visibility > VISIBILITY_THRESHOLD &&
@@ -416,7 +407,7 @@
 
                     setTimeout(() => {
                         gameState = 'POSITIONING_LEG';
-                        updateStatus("第二階段：請憑感覺，將單腳準確貼在小腿中點", "rgba(50,50,50,0.8)", "white", "var(--bamboo-green)");
+                        updateStatus("第二階段：請憑感覺，確實將單腳抬起貼在小腿中點", "rgba(50,50,50,0.8)", "white", "var(--bamboo-green)");
                     }, 1500);
                 }
                 return;
@@ -424,6 +415,7 @@
 
             if (gameState === 'POSITIONING_LEG' || gameState === 'PLAYING') {
                 
+                // 1. 判斷哪一隻腳是支撐腳 (Y越下面，數值越大)
                 let standAnkle, standKnee, raisedAnkle;
                 if (leftAnkle.y > rightAnkle.y) {
                     standAnkle = leftAnkle; standKnee = leftKnee; raisedAnkle = rightAnkle;
@@ -431,6 +423,16 @@
                     standAnkle = rightAnkle; standKnee = rightKnee; raisedAnkle = leftAnkle;
                 }
 
+                // --- 🌟 關鍵修正：計算玩家的小腿長度 (動態比例尺) ---
+                const calfDx = standAnkle.x - standKnee.x;
+                const calfDy = standAnkle.y - standKnee.y;
+                const calfLength = Math.sqrt(calfDx * calfDx + calfDy * calfDy);
+
+                // --- 🌟 關鍵修正：判斷玩家「真的有抬腳」---
+                // 高度差必須大於小腿長度的 30%，否則視為站在原地
+                const isFootRaised = (standAnkle.y - raisedAnkle.y) > (calfLength * 0.3);
+
+                // 2. 目標點：膝蓋與腳踝的 1/2 處
                 const targetMidX = (standKnee.x + standAnkle.x) / 2;
                 const targetMidY = (standKnee.y + standAnkle.y) / 2;
 
@@ -438,31 +440,38 @@
                 const dy = raisedAnkle.y - targetMidY;
                 const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
 
+                // --- 🌟 關鍵修正：動態容錯值 (不再用死板的 0.08) ---
+                // 開始條件：腳必須放進小腿長度 40% 的範圍內
+                const START_TOLERANCE = calfLength * 0.4; 
+                // 掉落條件：腳滑落超過小腿長度的 60%
+                const DROP_TOLERANCE = calfLength * 0.6;
+
+                // 計算身體晃動
                 const hipCenterX = (leftHip.x + rightHip.x) / 2;
                 const sway = nose.x - hipCenterX; 
                 const absSway = Math.abs(sway);
 
                 if (gameState === 'POSITIONING_LEG') {
-                    // 修正 2：嚴格的啟動容錯值
-                    if (distanceToTarget < START_TOLERANCE) { 
+                    // 必須「有抬腳」且「放到目標區域」才開始
+                    if (isFootRaised && distanceToTarget < START_TOLERANCE) { 
                         startGame();
                     }
                 } 
                 else if (gameState === 'PLAYING') {
                     
-                    // 修正 3：腳一離開小腿，直接破裂
-                    if (distanceToTarget > DROP_TOLERANCE) {
+                    // 失敗條件一：腳滑落了 或 偷偷把腳放回地上
+                    if (!isFootRaised || distanceToTarget > DROP_TOLERANCE) {
                         endGame("腳滑落了！蛋破裂！");
                         return;
                     }
 
+                    // 巨蛋傾斜
                     let tiltAngle = sway * 400; 
                     if(tiltAngle > 45) tiltAngle = 45;
                     if(tiltAngle < -45) tiltAngle = -45;
-                    
                     giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(${tiltAngle}deg)`;
 
-                    // 失敗判定：身體搖晃過大
+                    // 失敗條件二：身體搖晃過大
                     if (absSway > SWAY_FAIL) {
                         endGame("身體傾斜過大，蛋破了！");
                         return;
@@ -496,21 +505,17 @@
             }, 100); 
         }
 
-        // 修正 4：史詩級破裂特效觸發區
         function endGame(reason) {
             gameState = 'GAMEOVER';
             clearInterval(timerInterval);
             
-            // 觸發白頻閃光與全螢幕地震
             flashOverlay.classList.add('flash-active');
             document.body.classList.add('shake-screen');
-            
-            // 觸發巨蛋分離、裂痕與噴射蛋黃
             giantEggWrapper.classList.add('egg-broken-state');
             
             updateStatus(reason, "rgba(214, 73, 51, 0.9)", "white", "#FFF");
 
-            setTimeout(showResultScreen, 2000); // 讓特效飛一下再顯示結算
+            setTimeout(showResultScreen, 2000); 
         }
 
         function showResultScreen() {

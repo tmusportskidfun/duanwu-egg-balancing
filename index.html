@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>沉浸式立蛋挑戰</title>
+    <title>立蛋平衡大作戰</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -328,7 +328,7 @@
                     </div>
                 </div>
             </div>
-            <button id="agree-btn">同意並進入挑戰</button>
+            <button id="agree-btn">進入說明</button>
         </div>
 
         <div id="safety-slideshow-screen" class="screen hidden">
@@ -336,21 +336,21 @@
                 <img src="warmup.png" alt="熱身示意">
                 <div class="slide-caption">
                     <h3>1. 充分熱身</h3>
-                    <p>請跟隨示意圖，轉動腳踝、拉伸小腿與大腿肌肉，活絡關節以確保運動安全。</p>
+                    <p>遊玩前請確保足夠熱身腿部與腳踝，活絡關節以確保運動安全。</p>
                 </div>
             </div>
             <div class="slide hidden" id="slide-1">
                 <img src="wall.png" alt="靠牆安全示意圖">
                 <div class="slide-caption">
                     <h3>2. 安全環境</h3>
-                    <p>請在清空障礙物的平坦地面遊玩。強烈建議身後有牆壁，或身旁有穩固家具可隨時扶持，防止失衡跌倒。</p>
+                    <p>請在清空障礙物的平坦地面遊玩。強烈建議身後有牆壁，或有穩固家具可隨時扶持，防止失衡跌倒。</p>
                 </div>
             </div>
             <div class="slide hidden" id="slide-2">
                 <img src="motion.png" alt="單足立動作示意">
                 <div class="slide-caption">
                     <h3>3. 動作準備</h3>
-                    <p>雙手插腰或自然下垂。依指令明顯抬起一隻腳踝貼近支撐腳小腿。準備好後點擊進入下一步。</p>
+                    <p>雙手插腰或自然下垂。依指令明顯抬起一隻腳踝貼近支撐腳小腿。</p>
                 </div>
             </div>
             <div class="click-hint">(點擊畫面換頁)</div>
@@ -655,7 +655,7 @@
             if (isWin) {
                 titleEl.innerText = "🎉 挑戰成功 🎉";
                 rankTitle.innerText = "立蛋大宗師 (30秒滿分)";
-                rankDesc.innerText = "太厲害了！你的核心與平衡感絕佳，下肢肌力非常健康！";
+                rankDesc.innerText = "太厲害了！你的核心與平衡感絕佳！";
                 rankTitle.style.color = "var(--bamboo-green)";
             } else {
                 titleEl.innerText = "💥 蛋破了！ 💥";
@@ -668,8 +668,8 @@
                     rankDesc.innerText = "有基本的平衡能力！平常多散步、活動關節，能讓下盤更穩固。";
                     rankTitle.style.color = "#D68C33";
                 } else {
-                    rankTitle.innerText = "核心達人 (20-29秒)";
-                    rankDesc.innerText = "非常優秀！你的本體感覺很敏銳，只差一點點就能拿到滿分了！";
+                    rankTitle.innerText = "立蛋達人 (20-29秒)";
+                    rankDesc.innerText = "非常優秀！你的本體感覺與平衡很敏銳，只差一點點就能拿到滿分了！";
                     rankTitle.style.color = "#3376D6";
                 }
             }

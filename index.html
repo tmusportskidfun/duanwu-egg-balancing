@@ -44,19 +44,27 @@
         .flash-active { animation: flashAnim 0.8s ease-out forwards; }
         @keyframes flashAnim { 0% { opacity: 1; } 100% { opacity: 0; } }
 
-        /* --- 強風特效 --- */
+        /* --- 簡約橫向細線強風 --- */
         #wind-overlay {
-            position: absolute; top: 0; left: -50vw; width: 150vw; height: 100vh;
-            background: repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,0.4) 40px, rgba(255,255,255,0.6) 60px, transparent 100px);
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             opacity: 0; z-index: 18; pointer-events: none;
-            transform: skewX(-30deg); filter: blur(3px);
         }
-        .wind-active { animation: windBlizzard 1.2s cubic-bezier(0.25, 0.1, 0.25, 1); }
-        @keyframes windBlizzard {
-            0% { transform: skewX(-30deg) translateX(0); opacity: 0; }
-            10% { opacity: 1; }
-            80% { opacity: 1; }
-            100% { transform: skewX(-30deg) translateX(100vw); opacity: 0; }
+        .wind-active {
+            /* 使用多層背景創造不同粗細、長度的細線條 */
+            background:
+                linear-gradient(to right, transparent, rgba(255,255,255,0.8), transparent) 0 15% / 30% 1px no-repeat,
+                linear-gradient(to right, transparent, rgba(255,255,255,0.5), transparent) 0 28% / 50% 1px no-repeat,
+                linear-gradient(to right, transparent, rgba(255,255,255,0.9), transparent) 0 45% / 20% 2px no-repeat,
+                linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent) 0 60% / 60% 1px no-repeat,
+                linear-gradient(to right, transparent, rgba(255,255,255,0.7), transparent) 0 75% / 40% 1.5px no-repeat,
+                linear-gradient(to right, transparent, rgba(255,255,255,0.6), transparent) 0 88% / 25% 1px no-repeat;
+            animation: windSweep 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+        @keyframes windSweep {
+            0% { background-position: -50vw 15%, -80vw 28%, -30vw 45%, -100vw 60%, -60vw 75%, -40vw 88%; opacity: 0; }
+            15% { opacity: 1; }
+            85% { opacity: 1; }
+            100% { background-position: 150vw 15%, 150vw 28%, 150vw 45%, 150vw 60%, 150vw 75%, 150vw 88%; opacity: 0; }
         }
 
         /* --- 灑花特效 --- */
@@ -298,6 +306,8 @@
         let elapsedTime = 0; let timerInterval = null; let windTimer = null;
         
         let lockedStandKneeIdx = null; let lockedStandAnkleIdx = null; let lockedRaisedAnkleIdx = null;
+        let initialTiltOffset = 0; // 🌟 新增：用於記錄開始瞬間的身體傾斜基準值
+        
         const VISIBILITY_THRESHOLD = 0.6;  
 
         const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
@@ -325,6 +335,7 @@
         function resetGame() {
             gameState = 'POSITIONING_BODY';
             elapsedTime = 0; timerDisplay.innerText = "0.00";
+            initialTiltOffset = 0;
             
             skyBg.style.opacity = '0';
             giantEggWrapper.className = ''; giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(0deg)`;
@@ -378,12 +389,12 @@
 
             if (!nose || !leftShoulder || !rightShoulder || !leftHip || !rightHip || !leftKnee || !rightKnee || !leftAnkle || !rightAnkle) return;
 
-            // --- 計算真實軀幹傾斜 (完全防禦抬手與搖頭的誤判) ---
+            // --- 計算真實軀幹傾斜 ---
             const shoulderMid = { x: (leftShoulder.x + rightShoulder.x) / 2, y: (leftShoulder.y + rightShoulder.y) / 2 };
             const hipMid = { x: (leftHip.x + rightHip.x) / 2, y: (leftHip.y + rightHip.y) / 2 };
             const dxTilt = shoulderMid.x - hipMid.x; 
-            const dyTilt = hipMid.y - shoulderMid.y; // Y軸向下為正，所以 hip - shoulder 為正值
-            const trueTiltAngle = Math.atan2(dxTilt, dyTilt) * (180 / Math.PI); // 物理傾斜角度
+            const dyTilt = hipMid.y - shoulderMid.y; // Y軸向下為正
+            const trueTiltAngle = Math.atan2(dxTilt, dyTilt) * (180 / Math.PI); // 絕對物理傾斜角
 
             if (gameState === 'POSITIONING_BODY') {
                 const isFullBodyVisible = (nose.visibility > VISIBILITY_THRESHOLD && 
@@ -398,7 +409,6 @@
 
             if (gameState === 'POSITIONING_LEG' || gameState === 'PLAYING') {
                 
-                // 判斷支撐腳 (Y座標越大越靠近地面)
                 let standAnkle, standKnee, raisedAnkle;
                 let currentStandKneeIdx, currentStandAnkleIdx, currentRaisedAnkleIdx;
 
@@ -411,27 +421,24 @@
                         currentStandKneeIdx = 26; currentStandAnkleIdx = 28; currentRaisedAnkleIdx = 27;
                     }
                 } else {
-                    // 遊玩中鎖定腳位
                     standKnee = landmarks[lockedStandKneeIdx]; 
                     standAnkle = landmarks[lockedStandAnkleIdx];
                     raisedAnkle = landmarks[lockedRaisedAnkleIdx];
                 }
 
-                // 腳踝高度差 (判斷是否有確實抬離地面)
                 const ankleYDiff = standAnkle.y - raisedAnkle.y;
-                // 腳踝與支撐膝蓋的水平距離 (判斷是否靠近小腿)
                 const ankleXDiff = Math.abs(raisedAnkle.x - standKnee.x);
 
                 if (gameState === 'POSITIONING_LEG') {
                     const leftCalfMid = { x: (leftKnee.x + leftAnkle.x)/2, y: (leftKnee.y + leftAnkle.y)/2 };
                     const rightCalfMid = { x: (rightKnee.x + rightAnkle.x)/2, y: (rightKnee.y + rightAnkle.y)/2 };
                     
-                    // 繪製極小的精緻光圈
                     drawTargetCircle(leftCalfMid.x, leftCalfMid.y, 25, '#FFD700');
                     drawTargetCircle(rightCalfMid.x, rightCalfMid.y, 25, '#FFD700');
 
-                    // 開始條件：腳必須確實抬起 (Y差大於10%) 並且靠近小腿 (X差小於20%)
+                    // 開始條件滿足的瞬間
                     if (ankleYDiff > 0.1 && ankleXDiff < 0.2) {
+                        initialTiltOffset = trueTiltAngle; // 🌟 核心修正：將此瞬間的身體傾斜設為 0 度基準！
                         lockedStandKneeIdx = currentStandKneeIdx; 
                         lockedStandAnkleIdx = currentStandAnkleIdx; 
                         lockedRaisedAnkleIdx = currentRaisedAnkleIdx;
@@ -440,27 +447,28 @@
                 } 
                 else if (gameState === 'PLAYING') {
                     
-                    // 蛋視覺傾斜 (放大 2.5 倍以增加動態感)
-                    let displayTilt = trueTiltAngle * 2.5;
+                    // 🌟 使用「校正後的角度」，確保一開始一定是完美的 0 度正中間
+                    const calibratedTilt = trueTiltAngle - initialTiltOffset;
+                    
+                    let displayTilt = calibratedTilt * 2.5;
                     if(displayTilt > 45) displayTilt = 45; 
                     if(displayTilt < -45) displayTilt = -45;
                     giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(${displayTilt}deg)`;
 
                     if (Date.now() - playStartTime > 1000) {
                         
-                        // 失敗條件一：偷偷把腳放下來 (高度差小於 5%)
                         if (ankleYDiff < 0.05) {
                             endGame("腳落地了！蛋破裂！"); 
                             return;
                         }
 
-                        // 失敗條件二：真實軀幹傾斜大於 18 度 (完全無視抬手)
-                        if (Math.abs(trueTiltAngle) > 18) {
+                        // 使用校正後的角度判斷是否過於傾斜
+                        if (Math.abs(calibratedTilt) > 18) {
                             endGame("身體傾斜過大，蛋破了！");
                             return;
                         }
 
-                        if (Math.abs(trueTiltAngle) > 10) {
+                        if (Math.abs(calibratedTilt) > 10) {
                             updateStatus("⚠️ 太晃了，穩住核心！", "rgba(214, 73, 51, 0.9)", "white", "var(--danger-red)");
                         } else {
                             updateStatus("✨ 完美平衡中...", "rgba(74, 124, 89, 0.9)", "white", "var(--bamboo-green)");

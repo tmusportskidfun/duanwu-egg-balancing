@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>沉浸式端午立蛋挑戰</title>
+    <title>端午立蛋挑戰</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -13,7 +13,7 @@
         :root {
             --bamboo-green: #4A7C59;
             --danger-red: #D64933;
-            --glass-bg: rgba(250, 249, 246, 0.85);
+            --glass-bg: rgba(250, 249, 246, 0.9);
             --ink-black: #333333;
         }
 
@@ -38,94 +38,87 @@
 
         /* 白頻閃光特效 */
         #flash-overlay {
-            position: absolute; top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background-color: white;
-            z-index: 999; pointer-events: none;
-            opacity: 0;
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: white; z-index: 999; pointer-events: none; opacity: 0;
         }
         .flash-active { animation: flashAnim 0.8s ease-out forwards; }
         @keyframes flashAnim { 0% { opacity: 1; } 100% { opacity: 0; } }
 
+        /* --- 強風特效 --- */
+        #wind-overlay {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: repeating-linear-gradient(90deg, transparent, transparent 100px, rgba(255,255,255,0.15) 100px, rgba(255,255,255,0.15) 105px);
+            opacity: 0; z-index: 18; pointer-events: none;
+            transform: skewX(-20deg) scale(1.5);
+        }
+        .wind-active { animation: windMove 2s linear; }
+        @keyframes windMove {
+            0% { background-position: 0 0; opacity: 0; }
+            15% { opacity: 1; }
+            85% { opacity: 1; }
+            100% { background-position: -2000px 0; opacity: 0; }
+        }
+
+        /* --- 灑花特效 (勝利) --- */
+        .confetti {
+            position: absolute; width: 12px; height: 12px;
+            top: -20px; z-index: 999; pointer-events: none;
+            animation: fall linear forwards;
+        }
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(720deg); }
+        }
+
         /* --- 相機與天空層 --- */
         #video_container {
-            position: absolute; top: 0; left: 0;
-            width: 100vw; height: 100vh;
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             z-index: 1; overflow: hidden;
         }
         #input_video { display: none; }
-        #output_canvas {
-            width: 100%; height: 100%;
-            object-fit: cover; transform: scaleX(-1); 
-        }
+        #output_canvas { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 
         #sky-bg {
-            position: absolute; top: 0; left: 0;
-            width: 100vw; height: 100vh;
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             background: linear-gradient(to bottom, #74ebd5, #ACB6E5);
-            opacity: 0; z-index: 2; pointer-events: none;
-            transition: opacity 2s ease-in-out;
+            opacity: 0; z-index: 2; pointer-events: none; transition: opacity 2s ease-in-out;
         }
 
         /* --- 巨蛋與特效系統 --- */
         #giant-egg-wrapper {
-            position: absolute;
-            top: 55%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 220px; height: 300px;
-            z-index: 10; pointer-events: none;
-            transform-origin: bottom center; 
-            transition: transform 0.1s ease-out, filter 1s ease;
+            position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%);
+            width: 220px; height: 300px; z-index: 10; pointer-events: none;
+            transform-origin: bottom center; transition: transform 0.1s ease-out, filter 1s ease;
         }
-
         .egg-part {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
-            background-color: #Fdfbf7;
-            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #Fdfbf7; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
             box-shadow: inset -15px -15px 30px rgba(0,0,0,0.1), inset 5px 5px 15px rgba(255,255,255,0.8);
             border: 3px solid #EBE6D9; box-sizing: border-box;
             transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-
         #egg-bottom { clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%); }
-        
-        /* 修改：第二階段前，上半部隱藏在上面 */
         #egg-top {
             clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%);
-            transform: translateY(-100vh);
-            opacity: 0;
+            transform: translateY(-100vh); opacity: 0;
             transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s;
         }
-
-        /* 合體特效 */
         .egg-merged #egg-top { transform: translateY(0); opacity: 1; }
         .egg-merged { filter: drop-shadow(0 0 40px rgba(255, 215, 0, 1)); }
 
-        /* 逼真裂痕 */
         #crack-lines {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 15; opacity: 0;
         }
         #crack-lines polyline {
-            fill: none; stroke: #2a2a2a; stroke-width: 4;
-            stroke-linecap: round; stroke-linejoin: round;
-            filter: drop-shadow(1px 1px 0px rgba(255,255,255,0.8));
-            stroke-dasharray: 400; stroke-dashoffset: 400;
+            fill: none; stroke: #2a2a2a; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round;
+            filter: drop-shadow(1px 1px 0px rgba(255,255,255,0.8)); stroke-dasharray: 400; stroke-dashoffset: 400;
         }
-
-        /* 爆漿蛋黃 */
         #yolk-splash {
-            position: absolute; top: 50%; left: 50%;
-            width: 120px; height: 120px;
-            background: radial-gradient(circle, #FFB300 30%, #FF8C00 100%);
-            border-radius: 50%;
-            transform: translate(-50%, -50%) scale(0);
-            box-shadow: 0 0 30px rgba(255, 140, 0, 0.8);
+            position: absolute; top: 50%; left: 50%; width: 120px; height: 120px;
+            background: radial-gradient(circle, #FFB300 30%, #FF8C00 100%); border-radius: 50%;
+            transform: translate(-50%, -50%) scale(0); box-shadow: 0 0 30px rgba(255, 140, 0, 0.8);
             z-index: 12; opacity: 0;
         }
-
-        /* 破裂狀態 */
         .egg-broken-state .egg-part {
             background: linear-gradient(135deg, #EBE6D9 45%, #999 48%, #555 50%, #999 52%, #EBE6D9 55%);
             filter: grayscale(0.5); border-color: #777; box-shadow: none;
@@ -144,24 +137,19 @@
         /* --- UI --- */
         #ui-container {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-            z-index: 20; pointer-events: none;
-            display: flex; justify-content: center; align-items: center;
+            z-index: 20; pointer-events: none; display: flex; justify-content: center; align-items: center;
         }
-
         .screen {
             background: var(--glass-bg); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
             padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            text-align: center; width: 85%; max-width: 400px;
-            pointer-events: auto; border: 2px solid var(--bamboo-green);
+            text-align: center; width: 85%; max-width: 400px; pointer-events: auto; border: 2px solid var(--bamboo-green);
         }
         .hidden { display: none !important; }
-
         h1 { margin: 5px 0 15px 0; color: var(--bamboo-green); font-size: 24px; }
         h2 { margin: 5px 0; font-size: 18px; }
         button {
             background-color: var(--bamboo-green); color: white; border: none; padding: 15px 30px;
-            font-size: 18px; border-radius: 12px; cursor: pointer; transition: 0.2s;
-            margin-top: 20px; font-weight: bold; width: 100%; box-shadow: 0 4px 10px rgba(74, 124, 89, 0.4);
+            font-size: 18px; border-radius: 12px; cursor: pointer; transition: 0.2s; margin-top: 20px; font-weight: bold; width: 100%; box-shadow: 0 4px 10px rgba(74, 124, 89, 0.4);
         }
         button:hover { background-color: #386044; transform: translateY(-2px); }
 
@@ -170,37 +158,20 @@
             width: 95%; max-width: 500px; text-align: center; pointer-events: none;
             display: flex; flex-direction: column; align-items: center;
         }
-        
         #status-msg {
-            font-size: 17px; font-weight: bold; padding: 12px 20px;
-            background: var(--glass-bg); backdrop-filter: blur(5px);
-            border-radius: 30px; color: var(--ink-black);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: 0.3s; margin-bottom: 15px;
-            border: 2px solid var(--bamboo-green); width: 100%; box-sizing: border-box;
+            font-size: 17px; font-weight: bold; padding: 12px 20px; background: var(--glass-bg); backdrop-filter: blur(5px);
+            border-radius: 30px; color: var(--ink-black); box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: 0.3s; margin-bottom: 15px; border: 2px solid var(--bamboo-green); width: 100%; box-sizing: border-box;
         }
-
         #timer-display {
             font-size: 60px; font-weight: 900; color: white;
             text-shadow: 2px 2px 0px var(--bamboo-green), -2px -2px 0px var(--bamboo-green), 2px -2px 0px var(--bamboo-green), -2px 2px 0px var(--bamboo-green);
         }
-        
-        #music-toggle {
-            position: absolute; top: 20px; right: 20px; z-index: 30;
-            background: rgba(255,255,255,0.8); border-radius: 50%; width: 40px; height: 40px;
-            border: none; font-size: 20px; cursor: pointer; pointer-events: auto;
-        }
-
     </style>
 </head>
 <body>
-    
-    <audio id="bgm" loop preload="auto">
-        <source src="https://assets.mixkit.co/music/preview/mixkit-traditional-chinese-folk-music-2580.mp3" type="audio/mpeg">
-    </audio>
-
-    <button id="music-toggle">🎵</button>
 
     <div id="flash-overlay"></div>
+    <div id="wind-overlay"></div>
 
     <div id="video_container">
         <video id="input_video" autoplay playsinline></video>
@@ -221,11 +192,11 @@
 
     <div id="ui-container">
         <div id="intro-screen" class="screen">
-            <h1>🌿 沉浸式立蛋挑戰 🌿</h1>
+            <h1>🌿 防跌立蛋挑戰 🌿</h1>
             <ul style="text-align: left; line-height: 1.6; font-size: 15px; padding-left: 20px;">
-                <li><strong>階段一：</strong> 退後，讓<strong>頭、膝蓋與腳踝</strong>全入鏡，觸發天亮。</li>
-                <li><strong>階段二：</strong> 畫面會出現<strong>光圈</strong>。任選一腳抬起碰到光圈，蛋即會合體！</li>
-                <li><strong>破關條件：</strong> 合體後若重心不穩，或<strong>腳離開小腿</strong>，蛋會當場爆裂！</li>
+                <li><strong>準備：</strong> 退後，讓<strong>頭、膝蓋與腳踝</strong>全入鏡。</li>
+                <li><strong>開始：</strong> 畫面會出現<strong>黃色光圈</strong>。任選一隻腳抬起碰到光圈，天亮並開始計時！</li>
+                <li><strong>挑戰：</strong> 堅持 <strong>30 秒</strong> 獲得最高防跌稱號！注意不定時出現的強風，小心別讓腳滑落！</li>
             </ul>
             <button id="start-btn">開啟鏡頭與音效</button>
         </div>
@@ -238,10 +209,10 @@
         </div>
 
         <div id="result-screen" class="screen hidden">
-            <h1>💥 蛋破了！ 💥</h1>
+            <h1 id="result-title">💥 蛋破了！ 💥</h1>
             <h2 id="final-time">堅持時間：0.00 秒</h2>
             <hr style="border-top: 1px dashed #ccc; margin: 15px 0;">
-            <h3 style="color: var(--ink-black);">體適能常模評分：</h3>
+            <h3 style="color: var(--ink-black);">立蛋能力評估：</h3>
             <h2 id="rank-title" style="color: var(--danger-red); font-size: 26px;">稱號</h2>
             <p id="rank-desc" style="color: #555; font-size: 15px;"></p>
             <button id="retry-btn">再挑戰一次</button>
@@ -249,7 +220,7 @@
     </div>
 
     <script type="module">
-        // --- 網頁合成音效系統 (防連結失效) ---
+        // --- 網頁合成音效系統 ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
         function playTone(freq, type, duration, vol=0.1) {
@@ -274,17 +245,11 @@
             const bufferSize = audioCtx.sampleRate * 0.5; 
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
             const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1; 
-            }
-            const noise = audioCtx.createBufferSource();
-            noise.buffer = buffer;
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; 
+            const noise = audioCtx.createBufferSource(); noise.buffer = buffer;
             const gain = audioCtx.createGain();
-            
-            // 加入濾波器製造破裂感
             const filter = audioCtx.createBiquadFilter();
             filter.type = 'highpass'; filter.frequency.value = 1000;
-            
             noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
             gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
@@ -292,6 +257,25 @@
         }
         
         function playTick() { playTone(1200, 'square', 0.05, 0.05); }
+
+        function playWindSound() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const bufferSize = audioCtx.sampleRate * 2; 
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            const noise = audioCtx.createBufferSource(); noise.buffer = buffer;
+            const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(100, audioCtx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 1);
+            filter.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 2);
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 1);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2);
+            noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+            noise.start();
+        }
 
         // --- DOM Elements ---
         const videoElement = document.getElementById('input_video');
@@ -303,56 +287,40 @@
         const skyBg = document.getElementById('sky-bg');
         const giantEggWrapper = document.getElementById('giant-egg-wrapper');
         const flashOverlay = document.getElementById('flash-overlay');
+        const windOverlay = document.getElementById('wind-overlay');
         const startBtn = document.getElementById('start-btn');
         const retryBtn = document.getElementById('retry-btn');
         const timerDisplay = document.getElementById('timer-display');
         const statusMsg = document.getElementById('status-msg');
-        const bgm = document.getElementById('bgm');
-        const musicToggle = document.getElementById('music-toggle');
 
         let gameState = 'INIT'; 
-        let startTime = 0;
-        let playStartTime = 0; // 紀錄無敵緩衝時間
-        let elapsedTime = 0;
-        let timerInterval = null;
+        let startTime = 0; let playStartTime = 0; 
+        let elapsedTime = 0; let timerInterval = null; let windTimer = null;
         
-        // 鎖定玩家的抬腳資訊
-        let lockedStandKneeIdx = null;
-        let lockedStandAnkleIdx = null;
-        let lockedRaisedAnkleIdx = null;
+        let lockedStandKneeIdx = null; let lockedStandAnkleIdx = null; let lockedRaisedAnkleIdx = null;
 
         const VISIBILITY_THRESHOLD = 0.6;  
         const SWAY_FAIL = 0.12;
-
-        musicToggle.addEventListener('click', () => {
-            if(bgm.paused) { bgm.play(); musicToggle.innerText = "🎵"; }
-            else { bgm.pause(); musicToggle.innerText = "🔇"; }
-        });
 
         const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
         pose.setOptions({ modelComplexity: 0, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         pose.onResults(onResults);
 
         const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                if(gameState !== 'GAMEOVER' && gameState !== 'INIT') {
-                    await pose.send({image: videoElement});
-                }
-            }, facingMode: "user", width: 640, height: 480
+            onFrame: async () => { if(gameState !== 'GAMEOVER' && gameState !== 'INIT') await pose.send({image: videoElement}); }, 
+            facingMode: "user", width: 640, height: 480
         });
 
         startBtn.addEventListener('click', () => {
-            audioCtx.resume(); bgm.play().catch(e=>console.log("Auto-play blocked"));
-            introScreen.classList.add('hidden');
-            gameScreen.classList.remove('hidden');
-            resetGame();
-            camera.start();
+            audioCtx.resume();
+            introScreen.classList.add('hidden'); gameScreen.classList.remove('hidden');
+            resetGame(); camera.start();
         });
 
         retryBtn.addEventListener('click', () => {
-            resultScreen.classList.add('hidden');
-            gameScreen.classList.remove('hidden');
-            document.body.classList.remove('shake-screen'); 
+            resultScreen.classList.add('hidden'); gameScreen.classList.remove('hidden');
+            document.body.classList.remove('shake-screen');
+            document.querySelectorAll('.confetti').forEach(e => e.remove()); 
             resetGame();
         });
 
@@ -361,45 +329,33 @@
             elapsedTime = 0; timerDisplay.innerText = "0.00";
             
             skyBg.style.opacity = '0';
-            giantEggWrapper.className = ''; 
-            giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(0deg)`;
-            flashOverlay.className = '';
+            giantEggWrapper.className = ''; giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(0deg)`;
+            flashOverlay.className = ''; windOverlay.className = '';
             
             lockedStandKneeIdx = null; lockedStandAnkleIdx = null; lockedRaisedAnkleIdx = null;
+            clearTimeout(windTimer); clearInterval(timerInterval);
             
             updateStatus("第一階段：請退後，讓「頭、膝蓋、腳踝」全入鏡", "var(--glass-bg)", "var(--ink-black)", "var(--bamboo-green)");
-            clearInterval(timerInterval);
         }
 
         function updateStatus(text, bg, color, borderColor) {
-            statusMsg.innerText = text;
-            statusMsg.style.background = bg;
-            statusMsg.style.color = color;
-            statusMsg.style.borderColor = borderColor;
+            statusMsg.innerText = text; statusMsg.style.background = bg;
+            statusMsg.style.color = color; statusMsg.style.borderColor = borderColor;
         }
 
         function drawTargetCircle(x, y, radius, color) {
-            canvasCtx.beginPath();
-            canvasCtx.arc(x * canvasElement.width, y * canvasElement.height, radius, 0, 2 * Math.PI);
+            canvasCtx.beginPath(); canvasCtx.arc(x * canvasElement.width, y * canvasElement.height, radius, 0, 2 * Math.PI);
             canvasCtx.strokeStyle = color; canvasCtx.lineWidth = 4;
-            canvasCtx.shadowBlur = 15; canvasCtx.shadowColor = color;
-            canvasCtx.stroke();
-            
-            // 內圈點
-            canvasCtx.beginPath();
-            canvasCtx.arc(x * canvasElement.width, y * canvasElement.height, radius * 0.2, 0, 2 * Math.PI);
-            canvasCtx.fillStyle = color; canvasCtx.fill();
-            canvasCtx.shadowBlur = 0; // 重置陰影
+            canvasCtx.shadowBlur = 15; canvasCtx.shadowColor = color; canvasCtx.stroke();
+            canvasCtx.beginPath(); canvasCtx.arc(x * canvasElement.width, y * canvasElement.height, radius * 0.2, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = color; canvasCtx.fill(); canvasCtx.shadowBlur = 0;
         }
 
         function onResults(results) {
-            canvasCtx.save();
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.save(); canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             
-            // 只要不是遊戲結束，都畫出攝影機畫面
             if (gameState !== 'GAMEOVER') {
                 canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-                
                 if (results.poseLandmarks) {
                     const bodyLandmarks = results.poseLandmarks.map((lm, index) => index > 10 ? lm : { ...lm, visibility: 0 });
                     const BODY_CONNECTIONS = POSE_CONNECTIONS.filter(conn => conn[0] > 10 && conn[1] > 10);
@@ -407,14 +363,11 @@
                     drawLandmarks(canvasCtx, bodyLandmarks, {color: '#4A7C59', lineWidth: 1, radius: 2});
                 }
             }
-            
             if (results.poseLandmarks) processGameLogic(results.poseLandmarks);
             canvasCtx.restore();
         }
 
-        function getDist(p1, p2) {
-            return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
-        }
+        function getDist(p1, p2) { return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)); }
 
         function processGameLogic(landmarks) {
             if(gameState === 'GAMEOVER' || gameState === 'INIT') return;
@@ -430,79 +383,48 @@
                 const isFullBodyVisible = (nose.visibility > VISIBILITY_THRESHOLD && 
                                            leftKnee.visibility > VISIBILITY_THRESHOLD && rightKnee.visibility > VISIBILITY_THRESHOLD &&
                                            leftAnkle.visibility > VISIBILITY_THRESHOLD && rightAnkle.visibility > VISIBILITY_THRESHOLD);
-
                 if (isFullBodyVisible) {
                     gameState = 'POSITIONING_LEG'; 
-                    updateStatus("✅ 天亮了！請將任一隻腳踝，抬高放入光圈內！", "#FFD700", "black", "#FFD700");
-                    skyBg.style.opacity = '1';
+                    updateStatus("✅ 全身入鏡！請將任一隻腳抬起，放入光圈內！", "#FFD700", "black", "#FFD700");
                 }
                 return;
             }
 
             if (gameState === 'POSITIONING_LEG') {
-                // 計算左右兩腿的小腿中點
                 const leftCalfMid = { x: (leftKnee.x + leftAnkle.x)/2, y: (leftKnee.y + leftAnkle.y)/2 };
                 const rightCalfMid = { x: (rightKnee.x + rightAnkle.x)/2, y: (rightKnee.y + rightAnkle.y)/2 };
                 
-                // 動態計算光圈半徑 (利用小腿長度當比例尺)
-                const leftCalfLen = getDist(leftKnee, leftAnkle);
-                const rightCalfLen = getDist(rightKnee, rightAnkle);
-                const targetRadiusL = leftCalfLen * 0.4 * canvasElement.width; // 畫面上的像素半徑
+                const leftCalfLen = getDist(leftKnee, leftAnkle); const rightCalfLen = getDist(rightKnee, rightAnkle);
+                const targetRadiusL = leftCalfLen * 0.4 * canvasElement.width; 
                 const targetRadiusR = rightCalfLen * 0.4 * canvasElement.width;
 
-                // 畫出光圈引導玩家
                 drawTargetCircle(leftCalfMid.x, leftCalfMid.y, targetRadiusL, '#FFD700');
                 drawTargetCircle(rightCalfMid.x, rightCalfMid.y, targetRadiusR, '#FFD700');
 
-                // 判斷是否有腳放進光圈 (右腳踝進左光圈，或左腳踝進右光圈)
-                const distRtoL = getDist(rightAnkle, leftCalfMid);
-                const distLtoR = getDist(leftAnkle, rightCalfMid);
+                const distRtoL = getDist(rightAnkle, leftCalfMid); const distLtoR = getDist(leftAnkle, rightCalfMid);
 
                 if (distRtoL < leftCalfLen * 0.4) {
-                    // 右腳抬起，左腳支撐
-                    lockedStandKneeIdx = 25; lockedStandAnkleIdx = 27; lockedRaisedAnkleIdx = 28;
-                    startGame();
+                    lockedStandKneeIdx = 25; lockedStandAnkleIdx = 27; lockedRaisedAnkleIdx = 28; startGame();
                 } else if (distLtoR < rightCalfLen * 0.4) {
-                    // 左腳抬起，右腳支撐
-                    lockedStandKneeIdx = 26; lockedStandAnkleIdx = 28; lockedRaisedAnkleIdx = 27;
-                    startGame();
+                    lockedStandKneeIdx = 26; lockedStandAnkleIdx = 28; lockedRaisedAnkleIdx = 27; startGame();
                 }
             } 
             else if (gameState === 'PLAYING') {
-                
-                const standKnee = landmarks[lockedStandKneeIdx];
-                const standAnkle = landmarks[lockedStandAnkleIdx];
+                const standKnee = landmarks[lockedStandKneeIdx]; const standAnkle = landmarks[lockedStandAnkleIdx];
                 const raisedAnkle = landmarks[lockedRaisedAnkleIdx];
-
                 const calfMid = { x: (standKnee.x + standAnkle.x)/2, y: (standKnee.y + standAnkle.y)/2 };
-                const calfLen = getDist(standKnee, standAnkle);
-                const currentDist = getDist(raisedAnkle, calfMid);
+                const calfLen = getDist(standKnee, standAnkle); const currentDist = getDist(raisedAnkle, calfMid);
 
-                // 計算身體晃動
                 const hipCenterX = (leftHip.x + rightHip.x) / 2;
-                const sway = nose.x - hipCenterX; 
-                const absSway = Math.abs(sway);
+                const sway = nose.x - hipCenterX; const absSway = Math.abs(sway);
 
-                // 視覺巨蛋傾斜
                 let tiltAngle = sway * 400; 
-                if(tiltAngle > 45) tiltAngle = 45;
-                if(tiltAngle < -45) tiltAngle = -45;
+                if(tiltAngle > 45) tiltAngle = 45; if(tiltAngle < -45) tiltAngle = -45;
                 giantEggWrapper.style.transform = `translate(-50%, -50%) rotate(${tiltAngle}deg)`;
 
-                // --- 🌟 無敵緩衝期 (合體後1秒內不會破) ---
                 if (Date.now() - playStartTime > 1000) {
-                    
-                    // 嚴格判定：腳滑落
-                    if (currentDist > calfLen * 0.6) {
-                        endGame("腳滑落了！蛋破裂！");
-                        return;
-                    }
-
-                    // 嚴格判定：搖晃過大
-                    if (absSway > SWAY_FAIL) {
-                        endGame("身體傾斜過大，蛋破了！");
-                        return;
-                    } 
+                    if (currentDist > calfLen * 0.6) { endGame("腳滑落了！蛋破裂！"); return; }
+                    if (absSway > SWAY_FAIL) { endGame("身體傾斜過大，蛋破了！"); return; } 
 
                     if (absSway > SWAY_FAIL * 0.6) {
                         updateStatus("⚠️ 太晃了，穩住！", "rgba(214, 73, 51, 0.9)", "white", "var(--danger-red)");
@@ -510,67 +432,113 @@
                         updateStatus("✨ 完美平衡中...", "rgba(74, 124, 89, 0.9)", "white", "var(--bamboo-green)");
                     }
                 } else {
-                    updateStatus("🥚 合體成功！穩住重心...", "#FFD700", "black", "#FFD700");
+                    updateStatus("🥚 天亮合體！穩住重心...", "#FFD700", "black", "#FFD700");
                 }
             }
         }
 
         function startGame() {
-            gameState = 'PLAYING';
-            playStartTime = Date.now(); // 紀錄緩衝時間
-            startTime = Date.now();
+            gameState = 'PLAYING'; playStartTime = Date.now(); startTime = Date.now();
             
-            playMergeSound(); // 播放合體音效
-            giantEggWrapper.classList.add('egg-merged'); // 觸發動畫合體
-            
+            playMergeSound(); 
+            giantEggWrapper.classList.add('egg-merged'); 
+            skyBg.style.opacity = '1'; // 開始計時才天亮
+
+            scheduleNextWind();
+
             if(timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 elapsedTime = (Date.now() - startTime) / 1000;
-                timerDisplay.innerText = elapsedTime.toFixed(2);
-                if (Math.floor(elapsedTime * 10) % 10 === 0) playTick(); // 模擬計時滴答聲
+                
+                // 30秒上限勝利判定
+                if(elapsedTime >= 30) {
+                    elapsedTime = 30;
+                    winGame();
+                } else {
+                    timerDisplay.innerText = elapsedTime.toFixed(2);
+                    if (Math.floor(elapsedTime * 10) % 10 === 0) playTick(); 
+                }
             }, 100); 
+        }
+
+        // --- 強風系統 ---
+        function scheduleNextWind() {
+            if (gameState !== 'PLAYING') return;
+            const delay = 3000 + Math.random() * 5000; 
+            windTimer = setTimeout(() => {
+                if (gameState === 'PLAYING') { triggerWind(); scheduleNextWind(); }
+            }, delay);
+        }
+
+        function triggerWind() {
+            playWindSound();
+            windOverlay.classList.remove('wind-active');
+            void windOverlay.offsetWidth; 
+            windOverlay.classList.add('wind-active');
+        }
+
+        // --- 勝利灑花系統 ---
+        function startConfetti() {
+            const colors = ['#FFD700', '#D64933', '#4A7C59', '#74ebd5', '#FFF'];
+            for(let i=0; i<80; i++) {
+                const c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + 'vw';
+                c.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                c.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                c.style.animationDelay = Math.random() * 1 + 's';
+                document.body.appendChild(c);
+            }
+        }
+
+        function winGame() {
+            gameState = 'GAMEOVER';
+            clearInterval(timerInterval); clearTimeout(windTimer);
+            updateStatus("🎉 挑戰成功！", "#FFD700", "black", "#FFD700");
+            startConfetti();
+            setTimeout(() => showResultScreen(true), 2500);
         }
 
         function endGame(reason) {
             gameState = 'GAMEOVER';
-            clearInterval(timerInterval);
+            clearInterval(timerInterval); clearTimeout(windTimer);
             
-            playCrashSound(); // 播放破裂音效
-            
+            playCrashSound(); 
             flashOverlay.classList.add('flash-active');
             document.body.classList.add('shake-screen');
             giantEggWrapper.classList.add('egg-broken-state');
-            
             updateStatus(reason, "rgba(214, 73, 51, 0.9)", "white", "#FFF");
 
-            setTimeout(showResultScreen, 2000); 
+            setTimeout(() => showResultScreen(false), 2000); 
         }
 
-        function showResultScreen() {
-            gameScreen.classList.add('hidden');
-            resultScreen.classList.remove('hidden');
-            
+        function showResultScreen(isWin) {
+            gameScreen.classList.add('hidden'); resultScreen.classList.remove('hidden');
             document.getElementById('final-time').innerText = `堅持時間：${elapsedTime.toFixed(2)} 秒`;
-            
+            const titleEl = document.getElementById('result-title');
             const rankTitle = document.getElementById('rank-title');
             const rankDesc = document.getElementById('rank-desc');
 
-            if (elapsedTime < 5) {
-                rankTitle.innerText = "屈原的嘆息 (0-5秒)";
-                rankDesc.innerText = "剛合體就破啦！再多練習核心，下次一定行！";
-                rankTitle.style.color = "var(--danger-red)";
-            } else if (elapsedTime < 15) {
-                rankTitle.innerText = "雄黃小童 (5-15秒)";
-                rankDesc.innerText = "及格了！在看不到腳的情況下能站穩，很不容易！";
-                rankTitle.style.color = "#D68C33";
-            } else if (elapsedTime < 30) {
-                rankTitle.innerText = "龍舟舵手 (15-30秒)";
-                rankDesc.innerText = "不錯喔！本體感覺非常敏銳，是個標準的立蛋家。";
-                rankTitle.style.color = "#3376D6";
-            } else {
-                rankTitle.innerText = "盲測宗師 (30秒以上)";
-                rankDesc.innerText = "太神了！失去視覺還能人蛋合一，端午節立蛋王非你莫屬！";
+            if (isWin) {
+                titleEl.innerText = "🎉 挑戰成功 🎉";
+                rankTitle.innerText = "防跌大宗師 (30秒滿分)";
+                rankDesc.innerText = "太厲害了！您的核心與平衡感絕佳，下肢肌力非常健康！";
                 rankTitle.style.color = "var(--bamboo-green)";
+            } else {
+                titleEl.innerText = "💥 蛋破了！ 💥";
+                if (elapsedTime < 10) {
+                    rankTitle.innerText = "需要加強 (0-10秒)";
+                    rankDesc.innerText = "平衡感稍微不足喔！可以多扶著牆壁練習單腳站立，預防跌倒。";
+                    rankTitle.style.color = "var(--danger-red)";
+                } else if (elapsedTime < 20) {
+                    rankTitle.innerText = "表現不錯 (10-20秒)";
+                    rankDesc.innerText = "有基本的平衡能力！平常多散步、活動關節，能讓下盤更穩固。";
+                    rankTitle.style.color = "#D68C33";
+                } else {
+                    rankTitle.innerText = "核心達人 (20-29秒)";
+                    rankDesc.innerText = "非常優秀！您的本體感覺與平衡很敏銳，只差一點點就能拿到滿分了！";
+                    rankTitle.style.color = "#3376D6";
+                }
             }
         }
     </script>

@@ -386,19 +386,58 @@
 
     <script type="module">
         // ==========================================
-        // 1. UI 流程與事件綁定 (最優先執行，確保按鈕有反應)
+        // 核心變數與 DOM 元素宣告
         // ==========================================
-        const agreeBtn = document.getElementById('agree-btn');
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
         const statementScreen = document.getElementById('statement-screen');
         const safetySlideshowScreen = document.getElementById('safety-slideshow-screen');
         const introScreen = document.getElementById('intro-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const skyBgInitial = document.getElementById('sky-bg');
+        const skyBgGame = document.getElementById('sky-bg-game');
+        const giantEggWrapper = document.getElementById('giant-egg-wrapper');
+        const flashOverlay = document.getElementById('flash-overlay');
+        const windOverlay = document.getElementById('wind-overlay');
+        const agreeBtn = document.getElementById('agree-btn');
         const startBtn = document.getElementById('start-btn');
         const retryBtn = document.getElementById('retry-btn');
+        const timerDisplay = document.getElementById('timer-display');
+        const statusMsg = document.getElementById('status-msg');
+
+        let gameState = 'INIT'; 
+        let startTime = 0; let playStartTime = 0; 
+        let elapsedTime = 0; 
+        let timerInterval = null; let windTimer = null;
         
+        let lockedStandKneeIdx = null; let lockedStandAnkleIdx = null; let lockedRaisedAnkleIdx = null;
+        let initialTiltOffset = 0; 
+        const VISIBILITY_THRESHOLD = 0.6;  
+
         let currentSlideIndex = 0;
         const totalSlides = 3;
 
-        // 點擊「同意」進入幻燈片
+        // ==========================================
+        // 初始化 MediaPipe Pose 與 Camera (移到全域，確保按鈕抓得到)
+        // ==========================================
+        const pose = new window.Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
+        pose.setOptions({ modelComplexity: 0, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        pose.onResults(onResults);
+
+        const camera = new window.Camera(videoElement, {
+            onFrame: async () => { 
+                if(gameState !== 'GAMEOVER' && gameState !== 'INIT') {
+                    await pose.send({image: videoElement}); 
+                }
+            }, 
+            facingMode: "user", width: 640, height: 480
+        });
+
+        // ==========================================
+        // 1. UI 流程與事件綁定
+        // ==========================================
         agreeBtn.addEventListener('click', () => {
             statementScreen.classList.add('hidden');
             safetySlideshowScreen.classList.remove('hidden');
@@ -406,7 +445,6 @@
             updateSlidesDisplay();
         });
 
-        // 點擊「幻燈片」換頁
         safetySlideshowScreen.addEventListener('click', () => {
             currentSlideIndex++;
             if (currentSlideIndex < totalSlides) {
@@ -424,8 +462,26 @@
             document.getElementById(`slide-${currentSlideIndex}`).classList.remove('hidden');
         }
 
+        startBtn.addEventListener('click', () => {
+            initAudio(); 
+            skyBgInitial.style.display = 'none'; 
+            giantEggWrapper.classList.remove('hidden');
+            introScreen.classList.add('hidden'); 
+            gameScreen.classList.remove('hidden');
+            resetGame(); 
+            camera.start(); // 開啟鏡頭
+        });
+
+        retryBtn.addEventListener('click', () => {
+            resultScreen.classList.add('hidden'); 
+            gameScreen.classList.remove('hidden');
+            document.body.classList.remove('shake-screen');
+            document.querySelectorAll('.confetti').forEach(e => e.remove()); 
+            resetGame();
+        });
+
         // ==========================================
-        // 2. 音效系統 (Lazy Init，解決瀏覽器自動阻擋機制)
+        // 2. 音效系統 (Lazy Init)
         // ==========================================
         let audioCtx = null;
         
@@ -487,49 +543,12 @@
             noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
             noise.start();
         }
-
-        // ==========================================
-        // 3. 遊戲核心邏輯與畫面切換
-        // ==========================================
-        const videoElement = document.getElementById('input_video');
-        const canvasElement = document.getElementById('output_canvas');
-        const canvasCtx = canvasElement.getContext('2d');
-        const gameScreen = document.getElementById('game-screen');
-        const resultScreen = document.getElementById('result-screen');
-        const skyBgInitial = document.getElementById('sky-bg');
-        const skyBgGame = document.getElementById('sky-bg-game');
-        const giantEggWrapper = document.getElementById('giant-egg-wrapper');
-        const flashOverlay = document.getElementById('flash-overlay');
-        const windOverlay = document.getElementById('wind-overlay');
-        const timerDisplay = document.getElementById('timer-display');
-        const statusMsg = document.getElementById('status-msg');
-
-        let gameState = 'INIT'; 
-        let startTime = 0; let playStartTime = 0; 
-        let elapsedTime = 0; let timerInterval = null; let windTimer = null;
         
-        let lockedStandKneeIdx = null; let lockedStandAnkleIdx = null; let lockedRaisedAnkleIdx = null;
-        let initialTiltOffset = 0; 
-        const VISIBILITY_THRESHOLD = 0.6;  
+        function playTick() { playTone(1200, 'square', 0.05, 0.05); }
 
-        startBtn.addEventListener('click', () => {
-            initAudio(); // 延遲載入音效以符合瀏覽器規範
-            skyBgInitial.style.display = 'none'; 
-            giantEggWrapper.classList.remove('hidden');
-            introScreen.classList.add('hidden'); 
-            gameScreen.classList.remove('hidden');
-            resetGame(); 
-            camera.start(); // 開啟鏡頭
-        });
-
-        retryBtn.addEventListener('click', () => {
-            resultScreen.classList.add('hidden'); 
-            gameScreen.classList.remove('hidden');
-            document.body.classList.remove('shake-screen');
-            document.querySelectorAll('.confetti').forEach(e => e.remove()); 
-            resetGame();
-        });
-
+        // ==========================================
+        // 3. 遊戲核心邏輯 (重構回 lastversion 的狀態)
+        // ==========================================
         function resetGame() {
             gameState = 'POSITIONING_BODY';
             elapsedTime = 0; timerDisplay.innerText = "0.00";
@@ -552,72 +571,107 @@
             statusMsg.style.color = color; statusMsg.style.borderColor = borderColor;
         }
 
-        // --- 核心遺失邏輯補回：startGame 與 endGame ---
         function startGame() {
             gameState = 'PLAYING';
-            playStartTime = Date.now();
-            giantEggWrapper.classList.add('egg-merged');
-            playMergeSound();
+            playStartTime = Date.now(); startTime = Date.now();
             
+            playMergeSound(); 
+            giantEggWrapper.classList.add('egg-merged'); 
+            skyBgGame.style.opacity = '1'; 
+
+            scheduleNextWind();
+
+            if(timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
-                elapsedTime = (Date.now() - playStartTime) / 1000;
-                timerDisplay.innerText = elapsedTime.toFixed(2);
-                if (elapsedTime >= 30) {
-                    endGame("🏆 挑戰成功！完美立蛋！", true);
+                elapsedTime = (Date.now() - startTime) / 1000;
+                
+                if(elapsedTime >= 30) {
+                    elapsedTime = 30;
+                    winGame();
+                } else {
+                    timerDisplay.innerText = elapsedTime.toFixed(2);
+                    if (Math.floor(elapsedTime * 10) % 10 === 0) playTick(); 
                 }
-            }, 50);
-            
+            }, 100); 
+        }
+
+        function scheduleNextWind() {
+            if (gameState !== 'PLAYING') return;
+            const delay = 3000 + Math.random() * 7000; 
             windTimer = setTimeout(() => {
-                windOverlay.classList.add('wind-active');
-                playWindSound();
-                document.body.classList.add('shake-screen');
-            }, 10000); 
+                if (gameState === 'PLAYING') { triggerWind(); scheduleNextWind(); }
+            }, delay);
         }
 
-        function endGame(reason, isSuccess = false) {
-            gameState = 'GAMEOVER';
-            clearInterval(timerInterval);
-            clearTimeout(windTimer);
-            
-            if (isSuccess) {
-                playTone(880, 'sine', 0.2, 0.3);
-                setTimeout(() => playTone(1100, 'sine', 0.4, 0.3), 200);
-                updateStatus(reason, "rgba(74, 124, 89, 0.9)", "white", "var(--bamboo-green)");
-                createConfetti();
-            } else {
-                giantEggWrapper.classList.remove('egg-merged');
-                giantEggWrapper.classList.add('egg-broken-state');
-                playCrashSound();
-                flashOverlay.classList.add('flash-active');
-                document.body.classList.add('shake-screen');
-                updateStatus("💥 " + reason, "rgba(214, 73, 51, 0.9)", "white", "var(--danger-red)");
+        function triggerWind() {
+            playWindSound();
+            windOverlay.classList.remove('wind-active');
+            void windOverlay.offsetWidth; 
+            windOverlay.classList.add('wind-active');
+        }
+
+        function startConfetti() {
+            const colors = ['#FFD700', '#D64933', '#4A7C59', '#74ebd5', '#FFF'];
+            for(let i=0; i<80; i++) {
+                const c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + 'vw';
+                c.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                c.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                c.style.animationDelay = Math.random() * 1 + 's';
+                document.body.appendChild(c);
             }
-            
-            setTimeout(() => {
-                gameScreen.classList.add('hidden');
-                resultScreen.classList.remove('hidden');
-                document.getElementById('final-time').innerText = `堅持時間：${elapsedTime.toFixed(2)} 秒`;
-                
-                let rankTitle = ""; let rankDesc = "";
-                if (isSuccess) { rankTitle = "👑 立蛋宗師"; rankDesc = "你的平衡感簡直無懈可擊！"; }
-                else if (elapsedTime > 20) { rankTitle = "🥈 平衡達人"; rankDesc = "差一點就成功了，核心非常穩！"; }
-                else if (elapsedTime > 10) { rankTitle = "🥉 凡人立蛋"; rankDesc = "再多練練腿部力量，進步空間很大！"; }
-                else { rankTitle = "🪵 風中殘燭"; rankDesc = "剛開始就倒了...請確實做好熱身喔！"; }
-                
-                document.getElementById('rank-title').innerText = rankTitle;
-                document.getElementById('rank-desc').innerText = rankDesc;
-                document.getElementById('result-title').innerText = isSuccess ? "🎉 挑戰成功！ 🎉" : "💥 蛋破了！ 💥";
-            }, 1500);
         }
 
-        function createConfetti() {
-            for(let i=0; i<50; i++) {
-                const conf = document.createElement('div');
-                conf.className = 'confetti';
-                conf.style.left = Math.random() * 100 + 'vw';
-                conf.style.backgroundColor = ['#FFD700', '#4A7C59', '#D64933', '#74ebd5'][Math.floor(Math.random()*4)];
-                conf.style.animationDuration = (Math.random() * 2 + 1) + 's';
-                document.body.appendChild(conf);
+        function winGame() {
+            gameState = 'GAMEOVER';
+            clearInterval(timerInterval); clearTimeout(windTimer);
+            updateStatus("🎉 挑戰成功！", "#FFD700", "black", "#FFD700");
+            startConfetti();
+            setTimeout(() => showResultScreen(true), 2500);
+        }
+
+        function endGame(reason) {
+            gameState = 'GAMEOVER';
+            clearInterval(timerInterval); clearTimeout(windTimer);
+            
+            playCrashSound(); 
+            flashOverlay.classList.add('flash-active');
+            document.body.classList.add('shake-screen');
+            giantEggWrapper.classList.add('egg-broken-state');
+            updateStatus(reason, "rgba(214, 73, 51, 0.9)", "white", "#FFF");
+
+            setTimeout(() => showResultScreen(false), 2000);
+        }
+
+        function showResultScreen(isWin) {
+            gameScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            document.getElementById('final-time').innerText = `堅持時間：${elapsedTime.toFixed(2)} 秒`;
+            const titleEl = document.getElementById('result-title');
+            const rankTitle = document.getElementById('rank-title');
+            const rankDesc = document.getElementById('rank-desc');
+
+            if (isWin) {
+                titleEl.innerText = "🎉 挑戰成功 🎉";
+                rankTitle.innerText = "立蛋大宗師 (30秒滿分)";
+                rankDesc.innerText = "太厲害了！你的核心與平衡感絕佳，下肢肌力非常健康！";
+                rankTitle.style.color = "var(--bamboo-green)";
+            } else {
+                titleEl.innerText = "💥 蛋破了！ 💥";
+                if (elapsedTime < 10) {
+                    rankTitle.innerText = "需要加強 (0-10秒)";
+                    rankDesc.innerText = "平衡感稍微不足喔！可以多扶著牆壁練習單腳站立。";
+                    rankTitle.style.color = "var(--danger-red)";
+                } else if (elapsedTime < 20) {
+                    rankTitle.innerText = "表現不錯 (10-20秒)";
+                    rankDesc.innerText = "有基本的平衡能力！平常多散步、活動關節，能讓下盤更穩固。";
+                    rankTitle.style.color = "#D68C33";
+                } else {
+                    rankTitle.innerText = "核心達人 (20-29秒)";
+                    rankDesc.innerText = "非常優秀！你的本體感覺很敏銳，只差一點點就能拿到滿分了！";
+                    rankTitle.style.color = "#3376D6";
+                }
             }
         }
 
@@ -742,29 +796,6 @@
                     }
                 }
             }
-        }
-
-        // ==========================================
-        // 4. 初始化 MediaPipe (放最後，避免阻塞 UI)
-        // ==========================================
-        try {
-            const pose = new window.Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
-            pose.setOptions({ modelComplexity: 0, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-            pose.onResults(onResults);
-
-            const camera = new window.Camera(videoElement, {
-                onFrame: async () => { 
-                    if(gameState !== 'GAMEOVER' && gameState !== 'INIT') {
-                        await pose.send({image: videoElement}); 
-                    }
-                }, 
-                facingMode: "user", 
-                width: 640, 
-                height: 480
-            });
-            window.gameCamera = camera; // 存入全域變數以供 UI 控制
-        } catch(e) {
-            console.error("相機或姿態辨識初始化失敗：", e);
         }
     </script>
 </body>

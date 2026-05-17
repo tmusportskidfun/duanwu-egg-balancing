@@ -10,70 +10,50 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     
     <style>
-        /* --- 簡約端午風格 CSS --- */
         :root {
             --bamboo-green: #4A7C59;
-            --bamboo-light: #C8D5B9;
-            --rice-white: #FAF9F6;
-            --ink-black: #333333;
             --danger-red: #D64933;
             --glass-bg: rgba(250, 249, 246, 0.85);
+            --ink-black: #333333;
         }
 
         body {
             margin: 0; padding: 0;
             font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #000; /* 背景設為黑色，適配 contain 時產生的黑邊 */
+            background-color: #000;
             color: var(--ink-black);
             overflow: hidden;
             width: 100vw;
             height: 100vh;
-            /* 修正手機畫面拉伸：整體使用 flex 置中 */
-            display: flex;
-            justify-content: center;
-            align-items: center;
         }
 
-        /* --- 攝影機為主畫面容器 --- */
+        /* --- 修正：完美滿版且不拉伸變形 --- */
         #video_container {
             position: absolute;
             top: 0; left: 0;
             width: 100vw; height: 100vh;
             z-index: 1;
-            /* 修正手機畫面拉伸：容器本身也 Flex 置中 */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #000;
+            overflow: hidden;
         }
 
-        #input_video { display: none; } /* 隱藏原始影片元件 */
+        #input_video { display: none; }
 
-        /* 關鍵修正：解決拉伸變形 */
         #output_canvas {
-            /* 保持骨架數據判定所需的內部解析度，但 CSS 上縮放 */
-            width: auto;
-            height: auto;
-            max-width: 100%; /* 寬度不可超過螢幕 */
-            max-height: 100%; /* 高度不可超過螢幕 */
-            
-            /* 參考參考程式碼：使用 contain 保持原比例，不變形 */
-            object-fit: contain; 
-            
-            transform: scaleX(-1); /* 鏡像翻轉 */
+            width: 100%; 
+            height: 100%;
+            object-fit: cover; /* 關鍵：填滿整個螢幕且裁切多餘部分，去黑邊不變形 */
+            transform: scaleX(-1); /* 鏡像 */
         }
 
-        /* --- UI 浮層 (不受視訊變形影響) --- */
+        /* --- UI 浮層 --- */
         #ui-container {
             position: absolute; top: 0; left: 0;
             width: 100vw; height: 100vh;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
             z-index: 10;
-            pointer-events: none; /* 讓點擊可以穿透到按鈕 */
+            pointer-events: none;
+            display: flex; justify-content: center; align-items: center;
         }
 
-        /* 畫面層級 (毛玻璃效果) */
         .screen {
             background: var(--glass-bg);
             backdrop-filter: blur(8px);
@@ -82,7 +62,7 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             text-align: center;
             width: 85%; max-width: 400px;
-            pointer-events: auto; /* 恢復按鈕點擊 */
+            pointer-events: auto;
             border: 2px solid var(--bamboo-green);
         }
 
@@ -90,9 +70,7 @@
 
         h1 { margin: 5px 0 15px 0; color: var(--bamboo-green); font-size: 24px; }
         h2 { margin: 5px 0; font-size: 18px; }
-        h3 { margin: 5px 0; }
 
-        /* 按鈕風格 */
         button {
             background-color: var(--bamboo-green); color: white;
             border: none; padding: 15px 30px; font-size: 18px;
@@ -102,9 +80,12 @@
         }
         button:hover { background-color: #386044; transform: translateY(-2px); }
 
-        /* --- 遊戲進行中的上方狀態列 --- */
+        /* --- 修正：遊戲介面強制絕對置中 --- */
         #game-ui {
-            position: absolute; top: 8%;
+            position: absolute; 
+            top: 8%;
+            left: 50%;
+            transform: translateX(-50%); /* 關鍵置中語法 */
             width: 90%; max-width: 400px;
             text-align: center; pointer-events: none;
             display: flex; flex-direction: column; align-items: center;
@@ -126,7 +107,7 @@
             margin-bottom: 10px;
         }
 
-        /* --- 蛋的 CSS 特效 (縮小尺寸) --- */
+        /* 蛋的特效 */
         #egg-container {
             position: relative; width: 60px; height: 80px;
             perspective: 1000px; margin-bottom: 10px;
@@ -163,6 +144,24 @@
         ul { text-align: left; line-height: 1.6; font-size: 15px; color: #444; padding-left: 20px;}
         li { margin-bottom: 8px; }
         li strong { color: var(--danger-red); }
+
+        /* --- 新增：定位用人形虛線框 --- */
+        #human-outline {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 75%;
+            max-width: 300px;
+            opacity: 0.7;
+            pointer-events: none;
+            z-index: 5;
+            transition: opacity 0.5s;
+        }
+        /* 發光特效 */
+        .outline-glow {
+            filter: drop-shadow(0 0 10px #C8D5B9);
+        }
     </style>
 </head>
 <body>
@@ -172,13 +171,20 @@
         <canvas id="output_canvas" width="640" height="480"></canvas>
     </div>
 
+    <svg id="human-outline" class="hidden outline-glow" viewBox="0 0 200 450">
+        <circle cx="100" cy="50" r="35" stroke="white" stroke-width="6" stroke-dasharray="10 10" fill="none"/>
+        <path d="M 60 100 L 140 100 L 130 250 L 70 250 Z" stroke="white" stroke-width="6" stroke-dasharray="10 10" stroke-linejoin="round" fill="none"/>
+        <path d="M 75 250 L 75 420 M 125 250 L 125 420" stroke="white" stroke-width="6" stroke-dasharray="10 10" stroke-linecap="round" fill="none"/>
+        <path d="M 60 110 L 20 200 M 140 110 L 180 200" stroke="white" stroke-width="6" stroke-dasharray="10 10" stroke-linecap="round" fill="none"/>
+    </svg>
+
     <div id="ui-container">
         
         <div id="intro-screen" class="screen">
             <h1>🌿 端午立蛋挑戰 🌿</h1>
             <h2>— 開眼單足立 —</h2>
             <ul>
-                <li><strong>定位步驟：</strong> 需在<strong>網路連線良好</strong>處，請退後讓<strong>全身（頭到腳）</strong>入鏡。</li>
+                <li><strong>定位步驟：</strong> 請退後，將身體對齊畫面上出現的<strong>「人形虛線框」</strong>。</li>
                 <li><strong>開始方式：</strong> 定位完成後，將一腳抬起，<strong>腳踝貼在支撐腳膝蓋旁</strong>，自動計時！</li>
                 <li><strong>破關條件：</strong> 穩住核心。身體重心偏移太大，蛋就會破掉！</li>
             </ul>
@@ -187,7 +193,7 @@
 
         <div id="game-screen" class="hidden">
             <div id="game-ui">
-                <div id="status-msg">請退後，讓全身完整入鏡...</div>
+                <div id="status-msg">請退後，對齊人形虛線框...</div>
                 <div id="timer-display">0.00</div>
                 <div id="egg-container">
                     <div id="egg" class="egg"></div>
@@ -208,7 +214,6 @@
     </div>
 
     <script type="module">
-        // DOM 元素綁定
         const videoElement = document.getElementById('input_video');
         const canvasElement = document.getElementById('output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
@@ -216,6 +221,7 @@
         const introScreen = document.getElementById('intro-screen');
         const gameScreen = document.getElementById('game-screen');
         const resultScreen = document.getElementById('result-screen');
+        const humanOutline = document.getElementById('human-outline');
         
         const startBtn = document.getElementById('start-btn');
         const retryBtn = document.getElementById('retry-btn');
@@ -223,33 +229,27 @@
         const statusMsg = document.getElementById('status-msg');
         const eggElement = document.getElementById('egg');
 
-        // 遊戲狀態機
         let gameState = 'INIT'; 
         let startTime = 0;
         let elapsedTime = 0;
         let timerInterval = null;
 
-        // 判定參數
-        const VISIBILITY_THRESHOLD = 0.5;  // 降低门槛，方便手機定位
-        const START_DIST_THRESHOLD = 0.15;
-        const BREAK_DIST_THRESHOLD = 0.20;
+        const VISIBILITY_THRESHOLD = 0.5;  
         const SWAY_WARNING = 0.05;
         const SWAY_FAIL = 0.10;
 
-        // 1. 初始化 MediaPipe Pose (參考範例使用符合手機效能的設定)
         const pose = new Pose({locateFile: (file) => {
             return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
         }});
         
         pose.setOptions({
-            modelComplexity: 0, /* 改為 0 提高手機運算效能，雖然精度略降但更流暢 */
+            modelComplexity: 0, 
             smoothLandmarks: true,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
         pose.onResults(onResults);
 
-        // 初始化相機 (適配手機和電腦，參考範例使用較低解析度提高效能)
         const camera = new Camera(videoElement, {
             onFrame: async () => {
                 if(gameState !== 'GAMEOVER' && gameState !== 'INIT') {
@@ -257,11 +257,10 @@
                 }
             },
             facingMode: "user",
-            width: 640, /* 使用 4:3 解析度 */
+            width: 640, 
             height: 480
         });
 
-        // 按鈕事件
         startBtn.addEventListener('click', () => {
             introScreen.classList.add('hidden');
             gameScreen.classList.remove('hidden');
@@ -284,7 +283,7 @@
             timerDisplay.innerText = "0.00";
             eggElement.className = "egg";
             eggElement.style.transform = `rotate(0deg)`;
-            updateStatus("請退後，讓全身完整入鏡...", "var(--glass-bg)", "var(--ink-black)", "var(--bamboo-green)");
+            updateStatus("請退後，對齊人形虛線框...", "var(--glass-bg)", "var(--ink-black)", "var(--bamboo-green)");
             clearInterval(timerInterval);
         }
 
@@ -295,17 +294,22 @@
             statusMsg.style.borderColor = borderColor;
         }
 
-        // 2. 核心迴圈：處理 AI 數據與繪圖
         function onResults(results) {
-            // 在 Canvas 上繪製視訊畫面 (不使用 drawUtils 以節省資源)
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
             
             if (results.poseLandmarks) {
-                // 如果需要除錯，可以取消註解下方這行來顯示格線
-                // drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#ffffff', lineWidth: 2});
-                
+                // --- 隱藏臉部骨骼：過濾 0~10 號節點，只保留身體 ---
+                const bodyLandmarks = results.poseLandmarks.map((lm, index) => {
+                    return index > 10 ? lm : { ...lm, visibility: 0 }; // 將臉部透明度設為0不畫出
+                });
+                const BODY_CONNECTIONS = POSE_CONNECTIONS.filter(conn => conn[0] > 10 && conn[1] > 10);
+
+                // 畫出骨骼連線與節點 (隱藏臉部後)
+                drawConnectors(canvasCtx, bodyLandmarks, BODY_CONNECTIONS, {color: 'rgba(255, 255, 255, 0.7)', lineWidth: 4});
+                drawLandmarks(canvasCtx, bodyLandmarks, {color: '#4A7C59', lineWidth: 2, radius: 4});
+
                 processGameLogic(results.poseLandmarks);
             }
             canvasCtx.restore();
@@ -314,7 +318,13 @@
         function processGameLogic(landmarks) {
             if(gameState === 'GAMEOVER' || gameState === 'INIT') return;
 
-            // 取出關鍵點
+            // 控制人形框顯示與隱藏
+            if (gameState === 'POSITIONING') {
+                humanOutline.classList.remove('hidden');
+            } else {
+                humanOutline.classList.add('hidden');
+            }
+
             const nose = landmarks[0];
             const leftHip = landmarks[23];
             const rightHip = landmarks[24];
@@ -323,28 +333,23 @@
             const leftAnkle = landmarks[27];
             const rightAnkle = landmarks[28];
 
-            // 檢查關鍵點是否存在且可见度符合门槛
             if (!nose || !leftHip || !rightHip || !leftKnee || !rightKnee || !leftAnkle || !rightAnkle) return;
 
             const isFullBodyVisible = (nose.visibility > VISIBILITY_THRESHOLD && 
                                        leftAnkle.visibility > VISIBILITY_THRESHOLD && 
                                        rightAnkle.visibility > VISIBILITY_THRESHOLD);
 
-            // 狀態 1：全身定位中
             if (gameState === 'POSITIONING') {
                 if (isFullBodyVisible) {
                     gameState = 'READY';
-                    updateStatus("✅ 定位完成！請抬起單腳", "var(--bamboo-green)", "white", "var(--bamboo-green)");
+                    updateStatus("✅ 完美入鏡！請抬起單腳", "var(--bamboo-green)", "white", "var(--bamboo-green)");
                 } else {
-                    updateStatus("❌ 請調整距離，讓頭部與雙腳入鏡", "rgba(214, 73, 51, 0.9)", "white", "var(--danger-red)");
+                    updateStatus("❌ 請對齊虛線框，讓頭與腳都入鏡", "rgba(214, 73, 51, 0.9)", "white", "var(--danger-red)");
                     return; 
                 }
             }
 
-            // 狀態 2 & 3：遊戲開始與進行
             if (gameState === 'READY' || gameState === 'PLAYING') {
-                
-                // 判斷支撐腳與抬起腳
                 let standAnkle, standKnee, raisedAnkle;
                 if (leftAnkle.y > rightAnkle.y) {
                     standAnkle = leftAnkle; standKnee = leftKnee; raisedAnkle = rightAnkle;
@@ -352,27 +357,21 @@
                     standAnkle = rightAnkle; standKnee = rightKnee; raisedAnkle = leftAnkle;
                 }
 
-                // 計算抬起腳踝與支撐腳膝蓋旁目標點的 X 軸與 Y 軸距離 (簡化邏輯適配手機)
-                const footDistY = Math.abs(raisedAnkle.y - standKnee.y); // Y軸距離膝蓋高度
+                const footDistY = Math.abs(raisedAnkle.y - standKnee.y); 
                 
-                // 計算左右平衡 Sway
                 const hipCenterX = (leftHip.x + rightHip.x) / 2;
                 const sway = nose.x - hipCenterX; 
                 const absSway = Math.abs(sway);
 
-                // --- 邏輯判定 ---
                 if (gameState === 'READY') {
-                    // 抬起腳踝高度靠近膝蓋高度
                     if (footDistY < 0.1) { 
                         startGame();
                     }
                 } 
                 else if (gameState === 'PLAYING') {
-                    // 視覺回饋：搖晃蛋
                     let tiltAngle = sway * 300; 
                     eggElement.style.transform = `rotate(${tiltAngle}deg)`;
 
-                    // 1. 檢查搖晃
                     if (absSway > SWAY_FAIL) {
                         endGame("重心偏移過大！");
                         return;
@@ -384,7 +383,6 @@
                         updateStatus("完美平衡中...", "var(--bamboo-green)", "white", "var(--bamboo-green)");
                     }
 
-                    // 2. 檢查抬起腳是否掉落
                     if (footDistY > 0.2) {
                         endGame("腳落地了！");
                     }
@@ -401,12 +399,13 @@
             timerInterval = setInterval(() => {
                 elapsedTime = (Date.now() - startTime) / 1000;
                 timerDisplay.innerText = elapsedTime.toFixed(2);
-            }, 100); /* 降低 UI 更新頻率提高手機效能 */
+            }, 100); 
         }
 
         function endGame(reason) {
             gameState = 'GAMEOVER';
             clearInterval(timerInterval);
+            humanOutline.classList.add('hidden'); // 確保遊戲結束時隱藏人形
             
             eggElement.className = "egg egg-broken";
             updateStatus(reason, "rgba(51, 51, 51, 0.9)", "white", "#999");
